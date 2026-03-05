@@ -134,6 +134,11 @@ public class SpawnController {
 
     public long getTicksRemaining() { return intervalTicks - tickCounter; }
 
+    public boolean isNameOnCooldown(String name) {
+        LegendaryEntry entry = legendaryConfig.get(name);
+        return entry != null && isOnCooldown(name, entry);
+    }
+
     // ---- Spawn automatique ----
 
     private void spawnLegendary(@Nullable ServerPlayerEntity fixedTarget) {

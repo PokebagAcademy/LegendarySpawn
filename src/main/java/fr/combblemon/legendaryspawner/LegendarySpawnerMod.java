@@ -33,6 +33,7 @@ public class LegendarySpawnerMod implements ModInitializer {
 
         LegendaryCommand.register();
         NextLegCommand.register();
+        NextLegAdminCommand.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             spawnController = new SpawnController(server, config, legendaryConfig);

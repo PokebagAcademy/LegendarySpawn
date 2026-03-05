@@ -24,6 +24,7 @@ public class PermissionManager {
     public static final String LEGENDARY_MANAGE  = "legendaryspawner.command.legendary.manage";
     public static final String NEXTLEG           = "legendaryspawner.nextleg";
     public static final String NEXTLEG_DETAILS   = "legendaryspawner.nextleg.details";
+    public static final String NEXTLEG_ADMIN     = "legendaryspawner.nextleg.admin";
     public static final String LOG_VIEW          = "legendaryspawner.command.log";
     public static final String STATS             = "legendaryspawner.command.stats";
 
