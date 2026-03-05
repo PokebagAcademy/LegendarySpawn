@@ -1,16 +1,19 @@
 package fr.combblemon.legendaryspawner;
 
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.world.biome.Biome;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 public class SpawnController {
 
@@ -20,26 +23,6 @@ public class SpawnController {
     private long tickCounter = 0;
     private long intervalTicks;
     private boolean running = false;
-
-    private static final List<String> ALL_LEGENDARIES = List.of(
-            "mewtwo", "mew", "lugia", "hooh", "celebi",
-            "regirock", "regice", "registeel", "latias", "latios",
-            "kyogre", "groudon", "rayquaza", "jirachi", "deoxys",
-            "uxie", "mesprit", "azelf", "dialga", "palkia",
-            "heatran", "regigigas", "giratina", "cresselia", "darkrai",
-            "shaymin", "arceus", "victini", "cobalion", "terrakion",
-            "virizion", "reshiram", "zekrom", "kyurem", "xerneas",
-            "yveltal", "zygarde", "solgaleo", "lunala", "necrozma",
-            "zacian", "zamazenta", "eternatus", "koraidon", "miraidon",
-            "raikou", "entei", "suicune", "manaphy", "phione", "keldeo",
-            "meoletta", "genesect", "diancie", "hoopa", "volcanion",
-            "tapulele", "tapukoko", "tapubulu", "tapufini", "magearna",
-            "marshadow", "zeraora", "kubfu", "regieleki", "regidrago",
-            "glastrier", "spectrier", "calyrex", "enamorus", "zarude",
-            "meltan", "okidogi", "munkidori", "fezandipiti", "ogerpon",
-            "terapagos", "pecharunt", "wochien", "chienpao", "tinglu",
-            "chiyu"
-    );
 
     public SpawnController(MinecraftServer server, ModConfig config) {
         this.server = server;
@@ -80,12 +63,49 @@ public class SpawnController {
         return intervalTicks - tickCounter;
     }
 
+    // ---- Logique de spawn ----
+
     private void spawnLegendary() {
         List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
         if (players.isEmpty()) return;
 
-        ServerPlayerEntity target = players.get(random.nextInt(players.size()));
-        String pokemonName = pickLegendary();
+        LangConfig lang = LegendarySpawnerMod.getInstance().getLang();
+
+        // Construire la liste des candidats éligibles : (nom, joueurs compatibles, poids)
+        record Candidate(String name, List<ServerPlayerEntity> players, int weight) {}
+
+        List<Candidate> candidates = new ArrayList<>();
+        for (Map.Entry<String, LegendaryEntry> entry : config.legendaries.entrySet()) {
+            LegendaryEntry def = entry.getValue();
+            if (!def.enabled) continue;
+
+            List<ServerPlayerEntity> matching = getMatchingPlayers(def, players);
+            if (!matching.isEmpty()) {
+                candidates.add(new Candidate(entry.getKey(), matching, Math.max(1, def.weight)));
+            }
+        }
+
+        if (candidates.isEmpty()) {
+            LegendarySpawnerMod.LOGGER.warn(lang.get("spawn.no_eligible"));
+            return;
+        }
+
+        // Sélection pondérée d'un légendaire
+        int totalWeight = candidates.stream().mapToInt(Candidate::weight).sum();
+        int roll = random.nextInt(totalWeight);
+        int cumulative = 0;
+        Candidate chosen = candidates.get(candidates.size() - 1);
+        for (Candidate c : candidates) {
+            cumulative += c.weight;
+            if (roll < cumulative) {
+                chosen = c;
+                break;
+            }
+        }
+
+        // Sélection aléatoire d'un joueur éligible
+        ServerPlayerEntity target = chosen.players().get(random.nextInt(chosen.players().size()));
+        String pokemonName = chosen.name();
 
         // Spawn via commande Cobblemon
         String cmd = String.format("pokespawn %s level=%d", pokemonName, config.legendaryLevel);
@@ -97,36 +117,83 @@ public class SpawnController {
                 cmd
         );
 
-        broadcastSpawn(target, pokemonName);
+        broadcastSpawn(target, pokemonName, lang);
     }
 
-    private String pickLegendary() {
-        List<String> pool = (config.legendaries != null && !config.legendaries.isEmpty())
-                ? config.legendaries : ALL_LEGENDARIES;
-        return pool.get(random.nextInt(pool.size()));
-    }
-
-    private void broadcastSpawn(ServerPlayerEntity target, String pokemonName) {
+    private void broadcastSpawn(ServerPlayerEntity target, String pokemonName, LangConfig lang) {
         String displayName = formatName(pokemonName);
 
-        Text msg = Text.literal("")
-                .append(Text.literal("[✦ LÉGENDAIRE] ").formatted(Formatting.GOLD, Formatting.BOLD))
-                .append(Text.literal("Un ").formatted(Formatting.YELLOW))
-                .append(Text.literal(displayName).formatted(Formatting.RED, Formatting.BOLD))
-                .append(Text.literal(" est apparu près de ").formatted(Formatting.YELLOW))
-                .append(Text.literal(target.getName().getString()).formatted(Formatting.AQUA, Formatting.BOLD))
-                .append(Text.literal(" !").formatted(Formatting.YELLOW));
+        String broadcastMsg = lang.get("spawn.broadcast",
+                "pokemon", displayName,
+                "player", target.getName().getString());
+        server.getPlayerManager().broadcast(Text.literal(broadcastMsg), false);
 
-        server.getPlayerManager().broadcast(msg, false);
-
-        target.sendMessage(Text.literal("✦ Un légendaire ")
-                .formatted(Formatting.GOLD)
-                .append(Text.literal(displayName).formatted(Formatting.RED, Formatting.BOLD))
-                .append(Text.literal(" est apparu à côté de toi !").formatted(Formatting.YELLOW)));
+        String playerMsg = lang.get("spawn.notify_player", "pokemon", displayName);
+        target.sendMessage(Text.literal(playerMsg));
 
         target.getServerWorld().playSound(null, target.getBlockPos(),
                 SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 0.7f);
     }
+
+    // ---- Filtres de conditions ----
+
+    private List<ServerPlayerEntity> getMatchingPlayers(LegendaryEntry entry, List<ServerPlayerEntity> players) {
+        return players.stream()
+                .filter(p -> matchesDimension(entry, p))
+                .filter(p -> matchesTimeOfDay(entry, p))
+                .filter(p -> matchesWeather(entry, p))
+                .filter(p -> matchesBiome(entry, p))
+                .collect(Collectors.toList());
+    }
+
+    private boolean matchesBiome(LegendaryEntry entry, ServerPlayerEntity player) {
+        if (entry.biomes == null || entry.biomes.isEmpty()) return true;
+
+        ServerWorld world = player.getServerWorld();
+        RegistryEntry<Biome> biomeEntry = world.getBiome(player.getBlockPos());
+        String biomeId = biomeEntry.getKey()
+                .map(k -> k.getValue().toString())
+                .orElse("");
+
+        return entry.biomes.contains(biomeId);
+    }
+
+    private boolean matchesDimension(LegendaryEntry entry, ServerPlayerEntity player) {
+        if (entry.dimension == null || entry.dimension.equalsIgnoreCase("any")) return true;
+
+        String dimId = player.getServerWorld().getRegistryKey().getValue().toString();
+        return switch (entry.dimension.toLowerCase()) {
+            case "overworld" -> dimId.equals("minecraft:overworld");
+            case "nether"    -> dimId.equals("minecraft:the_nether");
+            case "end"       -> dimId.equals("minecraft:the_end");
+            default          -> dimId.equals(entry.dimension);
+        };
+    }
+
+    private boolean matchesTimeOfDay(LegendaryEntry entry, ServerPlayerEntity player) {
+        if (entry.timeOfDay == null || entry.timeOfDay.equalsIgnoreCase("any")) return true;
+
+        ServerWorld world = player.getServerWorld();
+        return switch (entry.timeOfDay.toLowerCase()) {
+            case "day"   -> world.isDay();
+            case "night" -> world.isNight();
+            default      -> true;
+        };
+    }
+
+    private boolean matchesWeather(LegendaryEntry entry, ServerPlayerEntity player) {
+        if (entry.weather == null || entry.weather.equalsIgnoreCase("any")) return true;
+
+        ServerWorld world = player.getServerWorld();
+        return switch (entry.weather.toLowerCase()) {
+            case "clear"   -> !world.isRaining();
+            case "rain"    -> world.isRaining() && !world.isThundering();
+            case "thunder" -> world.isThundering();
+            default        -> true;
+        };
+    }
+
+    // ---- Utilitaire ----
 
     private String formatName(String name) {
         String[] parts = name.split("_");

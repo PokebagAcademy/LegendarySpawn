@@ -14,13 +14,15 @@ public class LegendarySpawnerMod implements ModInitializer {
     private static LegendarySpawnerMod instance;
     private SpawnController spawnController;
     private ModConfig config;
+    private LangConfig lang;
 
     @Override
     public void onInitialize() {
         instance = this;
 
-        // Charger la config
+        // Charger la config et le lang
         config = ModConfig.load();
+        lang = LangConfig.load();
         LOGGER.info("[LegendarySpawner] Config chargée - intervalle : {} minutes", config.intervalMinutes);
 
         // Enregistrer les commandes
@@ -54,8 +56,13 @@ public class LegendarySpawnerMod implements ModInitializer {
         return config;
     }
 
+    public LangConfig getLang() {
+        return lang;
+    }
+
     public void reloadConfig() {
         config = ModConfig.load();
+        lang = LangConfig.load();
         if (spawnController != null) {
             spawnController.updateConfig(config);
         }

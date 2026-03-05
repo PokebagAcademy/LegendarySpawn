@@ -7,24 +7,62 @@ import net.fabricmc.loader.api.FabricLoader;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ModConfig {
 
-    // ---- Paramètres ----
+    // ---- Légendaires connus ----
 
-    /** Intervalle en minutes entre chaque spawn */
+    public static final List<String> ALL_LEGENDARIES = List.of(
+            // Gen 1
+            "mewtwo", "mew",
+            // Gen 2
+            "lugia", "hooh", "celebi", "raikou", "entei", "suicune",
+            // Gen 3
+            "regirock", "regice", "registeel", "latias", "latios",
+            "kyogre", "groudon", "rayquaza", "jirachi", "deoxys",
+            // Gen 4
+            "uxie", "mesprit", "azelf", "dialga", "palkia",
+            "heatran", "regigigas", "giratina", "cresselia", "darkrai",
+            "shaymin", "arceus",
+            // Gen 5
+            "victini", "cobalion", "terrakion", "virizion",
+            "reshiram", "zekrom", "kyurem", "keldeo", "meoletta", "genesect",
+            // Gen 6
+            "xerneas", "yveltal", "zygarde", "diancie", "hoopa", "volcanion",
+            // Gen 7
+            "solgaleo", "lunala", "necrozma",
+            "tapulele", "tapukoko", "tapubulu", "tapufini",
+            "magearna", "marshadow", "zeraora",
+            // Gen 8
+            "zacian", "zamazenta", "eternatus",
+            "kubfu", "regieleki", "regidrago",
+            "glastrier", "spectrier", "calyrex",
+            "enamorus", "zarude", "meltan",
+            // Gen 9
+            "koraidon", "miraidon",
+            "okidogi", "munkidori", "fezandipiti", "ogerpon",
+            "terapagos", "pecharunt",
+            "wochien", "chienpao", "tinglu", "chiyu",
+            // Mythiques divers
+            "manaphy", "phione"
+    );
+
+    // ---- Paramètres globaux ----
+
+    /** Intervalle en minutes entre chaque spawn. */
     public int intervalMinutes = 30;
 
-    /** Niveau des légendaires qui spawnent */
+    /** Niveau des légendaires qui spawnent. */
     public int legendaryLevel = 70;
 
     /**
-     * Liste des légendaires possibles.
-     * Laisser vide pour utiliser TOUS les légendaires.
+     * Configuration par légendaire.
+     * Clé = nom du Pokémon (ex: "mewtwo"), valeur = ses paramètres de spawn.
      */
-    public List<String> legendaries = new ArrayList<>();
+    public Map<String, LegendaryEntry> legendaries = new LinkedHashMap<>();
 
     // ---- Chargement / Sauvegarde ----
 
@@ -34,23 +72,31 @@ public class ModConfig {
             .resolve("legendaryspawner.json");
 
     public static ModConfig load() {
+        ModConfig cfg = new ModConfig();
+
         if (Files.exists(CONFIG_PATH)) {
             try (Reader reader = new FileReader(CONFIG_PATH.toFile())) {
-                ModConfig cfg = GSON.fromJson(reader, ModConfig.class);
-                if (cfg != null) {
+                ModConfig loaded = GSON.fromJson(reader, ModConfig.class);
+                if (loaded != null) {
+                    cfg = loaded;
                     LegendarySpawnerMod.LOGGER.info("[LegendarySpawner] Config chargée depuis {}", CONFIG_PATH);
-                    return cfg;
                 }
             } catch (IOException e) {
                 LegendarySpawnerMod.LOGGER.error("[LegendarySpawner] Erreur lecture config : {}", e.getMessage());
             }
         }
 
-        // Créer la config par défaut
-        ModConfig defaultConfig = new ModConfig();
-        defaultConfig.save();
-        LegendarySpawnerMod.LOGGER.info("[LegendarySpawner] Config par défaut créée dans {}", CONFIG_PATH);
-        return defaultConfig;
+        if (cfg.legendaries == null) {
+            cfg.legendaries = new LinkedHashMap<>();
+        }
+
+        // Ajoute les légendaires manquants avec des valeurs par défaut
+        for (String name : ALL_LEGENDARIES) {
+            cfg.legendaries.putIfAbsent(name, new LegendaryEntry());
+        }
+
+        cfg.save();
+        return cfg;
     }
 
     public void save() {
