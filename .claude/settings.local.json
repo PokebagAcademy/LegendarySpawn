@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gradle:*)",
+      "Bash(\"$GRADLE_BIN\" wrapper:*)",
+      "Bash(./gradlew build:*)"
+    ]
+  }
+}

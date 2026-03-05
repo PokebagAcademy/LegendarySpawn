@@ -36,7 +36,7 @@ public class LegendaryEntry {
     public String dimension = "any";
 
     /**
-     * Poids relatif de spawn (plus élevé = plus fréquent). Minimum : 1.
+     * Poids relatif de spawn (plus élevé = plus fréquent lors du tirage pondéré). Minimum : 1.
      */
     public int weight = 1;
 
@@ -54,8 +54,27 @@ public class LegendaryEntry {
     public int maxLevel = -1;
 
     /**
-     * Cooldown en minutes avant que ce légendaire puisse respawner.
-     * 0 = aucun cooldown.
+     * Cooldown en minutes avant que ce légendaire puisse respawner (0 = aucun).
      */
     public int cooldownMinutes = 0;
+
+    /**
+     * Chance de spawn en % à chaque cycle où ce légendaire est éligible.
+     * -1 = utilise defaultSpawnChance global (défaut : 25.0).
+     * Ex : 25.0 = 1 chance sur 4 de spawner quand les conditions sont remplies.
+     */
+    public double spawnChance = -1.0;
+
+    /**
+     * Bonus de % ajouté à chaque cycle où le légendaire était éligible mais n'a pas spawné.
+     * -1 = utilise defaultChanceIncrement global (défaut : 10.0).
+     * Ex : 10.0 = +10% par cycle raté.
+     */
+    public double chanceIncrement = -1.0;
+
+    /**
+     * Chance maximale que ce légendaire peut atteindre (accumulation plafonnée).
+     * -1 = utilise defaultMaxChance global (défaut : 100.0).
+     */
+    public double maxChance = -1.0;
 }

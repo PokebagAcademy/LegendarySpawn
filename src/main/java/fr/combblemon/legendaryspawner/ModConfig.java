@@ -52,34 +52,51 @@ public class ModConfig {
 
     // ---- Paramètres globaux ----
 
-    /** Intervalle en minutes entre chaque spawn. */
+    /** Intervalle en minutes entre chaque tentative de spawn. */
     public int intervalMinutes = 30;
 
-    /** Niveau par défaut des légendaires (utilisé si minLevel/maxLevel non définis). */
+    /** Niveau par défaut des légendaires (si minLevel/maxLevel non définis). */
     public int legendaryLevel = 70;
 
-    /**
-     * Minutes avant le spawn pour envoyer une annonce de prévention.
-     * 0 = désactivé.
-     */
+    /** Minutes avant le spawn pour envoyer une annonce (0 = désactivé). */
     public int warnMinutesBefore = 5;
 
-    /**
-     * Empêche le même légendaire de spawner plusieurs fois de suite.
-     * Fonctionne avec recentSpawnMemory.
-     */
+    /** Empêche le même légendaire de spawner plusieurs fois de suite. */
     public boolean preventRepeat = true;
 
-    /**
-     * Nombre de spawns récents mémorisés pour l'anti-répétition.
-     * Ex: 3 = les 3 derniers légendaires spawnés sont exclus du tirage.
-     */
+    /** Nombre de spawns récents mémorisés pour l'anti-répétition. */
     public int recentSpawnMemory = 3;
 
-    /**
-     * Enregistre chaque spawn dans logs/legendaryspawner-spawns.log.
-     */
+    /** Enregistre chaque spawn dans logs/legendaryspawner-spawns.log. */
     public boolean logSpawns = true;
+
+    /**
+     * Chance de spawn par défaut (en %) par cycle éligible.
+     * Utilisée si un légendaire n'a pas de spawnChance définie.
+     */
+    public double defaultSpawnChance = 25.0;
+
+    /**
+     * Bonus de chance (en %) ajouté par cycle raté par défaut.
+     * Utilisé si un légendaire n'a pas de chanceIncrement défini.
+     */
+    public double defaultChanceIncrement = 10.0;
+
+    /**
+     * Chance maximale par défaut (en %) qu'un légendaire peut atteindre.
+     * Utilisée si un légendaire n'a pas de maxChance définie.
+     */
+    public double defaultMaxChance = 100.0;
+
+    /**
+     * Distance minimale (en blocs) à laquelle le légendaire spawne autour du joueur.
+     */
+    public int spawnRadiusMin = 5;
+
+    /**
+     * Distance maximale (en blocs) à laquelle le légendaire spawne autour du joueur.
+     */
+    public int spawnRadiusMax = 15;
 
     /**
      * Configuration individuelle par légendaire.
@@ -109,9 +126,7 @@ public class ModConfig {
             }
         }
 
-        if (cfg.legendaries == null) {
-            cfg.legendaries = new LinkedHashMap<>();
-        }
+        if (cfg.legendaries == null) cfg.legendaries = new LinkedHashMap<>();
 
         // Ajoute les légendaires manquants avec des valeurs par défaut
         for (String name : ALL_LEGENDARIES) {

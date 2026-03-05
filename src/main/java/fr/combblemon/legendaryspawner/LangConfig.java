@@ -109,6 +109,8 @@ public class LangConfig {
                 "§eDimension: §a{value}");
         messages.put("command.legendary_info_biomes",
                 "§eBiomes: §a{value}");
+        messages.put("command.legendary_info_chance",
+                "§eChance: §abase §e{base}% §a→ actuelle §e{current}% §7(+{bonus}% accumulé, max {max}%, +{increment}%/cycle raté)");
 
         // --- Enable/Disable ---
         messages.put("command.legendary_enabled",
@@ -125,6 +127,24 @@ public class LangConfig {
                 "§c[LS] Valeur invalide pour §e{param}§c: §e{value}");
         messages.put("command.legendary_set_unknown_param",
                 "§c[LS] Paramètre inconnu: §e{param}§c. Valides: weight, minlevel, maxlevel, cooldown, timeofday, weather, dimension");
+
+        // --- /nextleg ---
+        messages.put("nextleg.header",
+                "§6§l[✦ PROCHAIN LÉGENDAIRE] §edans §b{minutes} min {seconds} sec§e.");
+        messages.put("nextleg.separator",
+                "§7─────────────────────────");
+        messages.put("nextleg.player_header",
+                "§b[{player}] §7({context})");
+        messages.put("nextleg.eligible_entry",
+                "  §a✔ §e{pokemon} §7→ §a{chance}%{bonus}");
+        messages.put("nextleg.no_eligible_player",
+                "  §7Aucun légendaire éligible.");
+        messages.put("nextleg.own_header",
+                "§7Tes légendaires éligibles:");
+        messages.put("nextleg.own_none",
+                "§7Aucun légendaire éligible pour ta position actuelle.");
+        messages.put("nextleg.total",
+                "§eTotal éligibles: §b{count} §elégendaire(s).");
 
         // --- Biome ---
         messages.put("command.legendary_biome_added",

@@ -15,60 +15,48 @@ public class LegendarySpawnerMod implements ModInitializer {
     private SpawnController spawnController;
     private ModConfig config;
     private LangConfig lang;
+    private ChanceTracker chanceTracker;
 
     @Override
     public void onInitialize() {
         instance = this;
 
-        // Charger la config et le lang
-        config = ModConfig.load();
-        lang = LangConfig.load();
+        config       = ModConfig.load();
+        lang         = LangConfig.load();
+        chanceTracker = ChanceTracker.load();
+
         LOGGER.info("[LegendarySpawner] Config chargée - intervalle : {} minutes", config.intervalMinutes);
 
-        // Enregistrer les commandes
         LegendaryCommand.register();
+        NextLegCommand.register();
 
-        // Démarrer le controller de spawn au lancement du serveur
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             spawnController = new SpawnController(server, config);
             spawnController.start();
-            LOGGER.info("[LegendarySpawner] Mod activé ! Un légendaire spawne toutes les {} minutes.", config.intervalMinutes);
+            LOGGER.info("[LegendarySpawner] Mod activé ! Spawn toutes les {} minutes.", config.intervalMinutes);
         });
 
-        // Tick du serveur pour gérer le timer
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            if (spawnController != null) {
-                spawnController.tick();
-            }
+            if (spawnController != null) spawnController.tick();
         });
 
-        // Arrêt propre
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             if (spawnController != null) spawnController.stop();
+            chanceTracker.save();
         });
     }
 
-    public static LegendarySpawnerMod getInstance() {
-        return instance;
-    }
+    public static LegendarySpawnerMod getInstance() { return instance; }
 
-    public ModConfig getConfig() {
-        return config;
-    }
-
-    public LangConfig getLang() {
-        return lang;
-    }
+    public ModConfig getConfig()          { return config; }
+    public LangConfig getLang()           { return lang; }
+    public ChanceTracker getChanceTracker() { return chanceTracker; }
+    public SpawnController getSpawnController() { return spawnController; }
 
     public void reloadConfig() {
         config = ModConfig.load();
-        lang = LangConfig.load();
-        if (spawnController != null) {
-            spawnController.updateConfig(config);
-        }
-    }
-
-    public SpawnController getSpawnController() {
-        return spawnController;
+        lang   = LangConfig.load();
+        // Les chances accumulées sont préservées au reload
+        if (spawnController != null) spawnController.updateConfig(config);
     }
 }
