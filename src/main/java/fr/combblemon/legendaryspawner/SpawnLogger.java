@@ -5,9 +5,12 @@ import net.minecraft.server.network.ServerPlayerEntity;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Enregistre les spawns de légendaires dans logs/legendaryspawner-spawns.log.
@@ -38,6 +41,30 @@ public class SpawnLogger {
             fw.write(line);
         } catch (IOException e) {
             LegendarySpawnerMod.LOGGER.error("[LegendarySpawner] Erreur écriture log spawn : {}", e.getMessage());
+        }
+    }
+
+    /** Retourne les n dernières lignes du log (ordre chronologique). Retourne liste vide si le fichier n'existe pas. */
+    public static List<String> getLastLines(int n) {
+        if (!Files.exists(LOG_PATH)) return Collections.emptyList();
+        try {
+            List<String> all = Files.readAllLines(LOG_PATH);
+            int from = Math.max(0, all.size() - n);
+            return all.subList(from, all.size());
+        } catch (IOException e) {
+            LegendarySpawnerMod.LOGGER.error("[LegendarySpawner] Erreur lecture log spawn : {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /** Efface le fichier de log. */
+    public static boolean clear() {
+        try {
+            Files.deleteIfExists(LOG_PATH);
+            return true;
+        } catch (IOException e) {
+            LegendarySpawnerMod.LOGGER.error("[LegendarySpawner] Erreur suppression log spawn : {}", e.getMessage());
+            return false;
         }
     }
 

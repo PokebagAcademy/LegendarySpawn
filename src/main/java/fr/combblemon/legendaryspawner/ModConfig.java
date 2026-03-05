@@ -7,48 +7,8 @@ import net.fabricmc.loader.api.FabricLoader;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 public class ModConfig {
-
-    // ---- Liste de référence de tous les légendaires/mythiques connus ----
-
-    public static final List<String> ALL_LEGENDARIES = List.of(
-            // Gen 1
-            "mewtwo", "mew",
-            // Gen 2
-            "lugia", "hooh", "celebi", "raikou", "entei", "suicune",
-            // Gen 3
-            "regirock", "regice", "registeel", "latias", "latios",
-            "kyogre", "groudon", "rayquaza", "jirachi", "deoxys",
-            // Gen 4
-            "uxie", "mesprit", "azelf", "dialga", "palkia",
-            "heatran", "regigigas", "giratina", "cresselia", "darkrai",
-            "shaymin", "arceus",
-            // Gen 5
-            "victini", "cobalion", "terrakion", "virizion",
-            "reshiram", "zekrom", "kyurem", "keldeo", "meoletta", "genesect",
-            // Gen 6
-            "xerneas", "yveltal", "zygarde", "diancie", "hoopa", "volcanion",
-            // Gen 7
-            "solgaleo", "lunala", "necrozma",
-            "tapulele", "tapukoko", "tapubulu", "tapufini",
-            "magearna", "marshadow", "zeraora",
-            // Gen 8
-            "zacian", "zamazenta", "eternatus",
-            "kubfu", "regieleki", "regidrago",
-            "glastrier", "spectrier", "calyrex",
-            "enamorus", "zarude", "meltan",
-            // Gen 9
-            "koraidon", "miraidon",
-            "okidogi", "munkidori", "fezandipiti", "ogerpon",
-            "terapagos", "pecharunt",
-            "wochien", "chienpao", "tinglu", "chiyu",
-            // Mythiques divers
-            "manaphy", "phione"
-    );
 
     // ---- Paramètres globaux ----
 
@@ -70,47 +30,44 @@ public class ModConfig {
     /** Enregistre chaque spawn dans logs/legendaryspawner-spawns.log. */
     public boolean logSpawns = true;
 
-    /**
-     * Chance de base (en %) qu'un légendaire spawne à chaque tick.
-     */
+    /** Chance de base (en %) qu'un légendaire spawne à chaque tick. */
     public double spawnChance = 25.0;
 
-    /**
-     * Bonus de % ajouté à spawnChance à chaque tick raté (aucun spawn).
-     * S'accumule jusqu'à maxChance. Remis à 0 quand un légendaire spawne.
-     */
+    /** Bonus de % ajouté à spawnChance à chaque tick raté. S'accumule jusqu'à maxChance. */
     public double chanceIncrement = 10.0;
 
-    /**
-     * Chance maximale (en %) que le système peut atteindre via accumulation.
-     */
+    /** Chance maximale (en %) que le système peut atteindre via accumulation. */
     public double maxChance = 100.0;
 
-    /**
-     * Distance minimale (en blocs) à laquelle le légendaire spawne autour du joueur.
-     */
+    /** Nombre minimum de joueurs en ligne pour que le timer tourne (0 = toujours actif). */
+    public int minPlayersToTick = 0;
+
+    /** Nombre d'IVs à 31 attribués aléatoirement au légendaire spawné (parmi les 6 stats). 0 = désactivé. */
+    public int perfectIvCount = 3;
+
+    /** Chance (en %) que le légendaire spawné soit shiny. 0 = désactivé. */
+    public double shinyChance = 0.0;
+
+    /** Secondes d'inactivité avant qu'un joueur soit considéré AFK et ignoré pour le spawn. 0 = désactivé. */
+    public int ignoreAfkSeconds = 0;
+
+    /** Distance minimale (en blocs) à laquelle le légendaire spawne autour du joueur. */
     public int spawnRadiusMin = 5;
 
-    /**
-     * Distance maximale (en blocs) à laquelle le légendaire spawne autour du joueur.
-     */
+    /** Distance maximale (en blocs) à laquelle le légendaire spawne autour du joueur. */
     public int spawnRadiusMax = 15;
-
-    /**
-     * Configuration individuelle par légendaire.
-     * Clé = nom du Pokémon (ex: "mewtwo"), valeur = ses paramètres de spawn.
-     */
-    public Map<String, LegendaryEntry> legendaries = new LinkedHashMap<>();
 
     // ---- Chargement / Sauvegarde ----
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path CONFIG_PATH = FabricLoader.getInstance()
             .getConfigDir()
-            .resolve("legendaryspawner.json");
+            .resolve("legendaryspawner")
+            .resolve("config.json");
 
     public static ModConfig load() {
         ModConfig cfg = new ModConfig();
+        try { Files.createDirectories(CONFIG_PATH.getParent()); } catch (IOException ignored) {}
 
         if (Files.exists(CONFIG_PATH)) {
             try (Reader reader = new FileReader(CONFIG_PATH.toFile())) {
@@ -122,13 +79,6 @@ public class ModConfig {
             } catch (IOException e) {
                 LegendarySpawnerMod.LOGGER.error("[LegendarySpawner] Erreur lecture config : {}", e.getMessage());
             }
-        }
-
-        if (cfg.legendaries == null) cfg.legendaries = new LinkedHashMap<>();
-
-        // Ajoute les légendaires manquants avec des valeurs par défaut
-        for (String name : ALL_LEGENDARIES) {
-            cfg.legendaries.putIfAbsent(name, new LegendaryEntry());
         }
 
         cfg.save();

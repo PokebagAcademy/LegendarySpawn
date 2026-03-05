@@ -14,16 +14,20 @@ public class LegendarySpawnerMod implements ModInitializer {
     private static LegendarySpawnerMod instance;
     private SpawnController spawnController;
     private ModConfig config;
+    private LegendaryConfig legendaryConfig;
     private LangConfig lang;
     private ChanceTracker chanceTracker;
+    private SpawnStats stats;
 
     @Override
     public void onInitialize() {
         instance = this;
 
-        config       = ModConfig.load();
-        lang         = LangConfig.load();
-        chanceTracker = ChanceTracker.load();
+        config         = ModConfig.load();
+        legendaryConfig = LegendaryConfig.load();
+        lang           = LangConfig.load();
+        chanceTracker  = ChanceTracker.load();
+        stats          = SpawnStats.load();
 
         LOGGER.info("[LegendarySpawner] Config chargée - intervalle : {} minutes", config.intervalMinutes);
 
@@ -31,7 +35,7 @@ public class LegendarySpawnerMod implements ModInitializer {
         NextLegCommand.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            spawnController = new SpawnController(server, config);
+            spawnController = new SpawnController(server, config, legendaryConfig);
             spawnController.start();
             LOGGER.info("[LegendarySpawner] Mod activé ! Spawn toutes les {} minutes.", config.intervalMinutes);
         });
@@ -48,15 +52,17 @@ public class LegendarySpawnerMod implements ModInitializer {
 
     public static LegendarySpawnerMod getInstance() { return instance; }
 
-    public ModConfig getConfig()          { return config; }
-    public LangConfig getLang()           { return lang; }
-    public ChanceTracker getChanceTracker() { return chanceTracker; }
+    public ModConfig getConfig()                { return config; }
+    public LegendaryConfig getLegendaryConfig() { return legendaryConfig; }
+    public LangConfig getLang()                 { return lang; }
+    public ChanceTracker getChanceTracker()     { return chanceTracker; }
     public SpawnController getSpawnController() { return spawnController; }
+    public SpawnStats getStats()                { return stats; }
 
     public void reloadConfig() {
-        config = ModConfig.load();
-        lang   = LangConfig.load();
-        // Les chances accumulées sont préservées au reload
-        if (spawnController != null) spawnController.updateConfig(config);
+        config         = ModConfig.load();
+        legendaryConfig = LegendaryConfig.load();
+        lang           = LangConfig.load();
+        if (spawnController != null) spawnController.updateConfig(config, legendaryConfig);
     }
 }

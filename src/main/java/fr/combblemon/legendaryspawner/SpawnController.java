@@ -7,7 +7,9 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.Heightmap;
 import net.minecraft.world.biome.Biome;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,6 +21,7 @@ public class SpawnController {
 
     private final MinecraftServer server;
     private ModConfig config;
+    private LegendaryConfig legendaryConfig;
 
     private long tickCounter = 0;
     private long absoluteTick = 0;
@@ -28,28 +31,46 @@ public class SpawnController {
     private final LinkedList<String> recentSpawns = new LinkedList<>();
     private final Map<String, Long> cooldownTracker = new HashMap<>();
 
-    /** Groupe légendaire + joueurs compatibles + poids */
+    // ---- AFK tracking ----
+    private final Map<UUID, Vec3d> afkLastPos = new HashMap<>();
+    private final Map<UUID, Long>  afkSince   = new HashMap<>();
+
     private record Candidate(String name, List<ServerPlayerEntity> players, int weight) {}
 
-    public SpawnController(MinecraftServer server, ModConfig config) {
+    private static final String[] IV_PROPERTIES = {
+        "hp_iv", "attack_iv", "defence_iv", "special_attack_iv", "special_defence_iv", "speed_iv"
+    };
+
+    public SpawnController(MinecraftServer server, ModConfig config, LegendaryConfig legendaryConfig) {
         this.server = server;
         this.config = config;
+        this.legendaryConfig = legendaryConfig;
         this.intervalTicks = (long) config.intervalMinutes * 60 * 20;
     }
 
     public void start() { running = true; tickCounter = 0; }
     public void stop()  { running = false; }
 
-    public void updateConfig(ModConfig newConfig) {
+    public void updateConfig(ModConfig newConfig, LegendaryConfig newLegendaryConfig) {
         this.config = newConfig;
+        this.legendaryConfig = newLegendaryConfig;
         this.intervalTicks = (long) newConfig.intervalMinutes * 60 * 20;
         if (tickCounter > intervalTicks) tickCounter = intervalTicks - 1;
     }
 
     public void tick() {
         if (!running) return;
+
+        if (config.minPlayersToTick > 0
+                && server.getPlayerManager().getCurrentPlayerCount() < config.minPlayersToTick) {
+            return;
+        }
+
         absoluteTick++;
         tickCounter++;
+
+        // Mise à jour AFK toutes les secondes
+        if (absoluteTick % 20 == 0) updateAfkTracking();
 
         if (config.warnMinutesBefore > 0) {
             long warnTicks = (long) config.warnMinutesBefore * 60 * 20;
@@ -64,7 +85,6 @@ public class SpawnController {
         }
     }
 
-    /** Force un spawn : bypass chance globale et conditions, respect du joueur cible si fourni. */
     public void forceSpawn(@Nullable ServerPlayerEntity fixedTarget) {
         tickCounter = 0;
         List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
@@ -72,7 +92,7 @@ public class SpawnController {
 
         LangConfig lang = LegendarySpawnerMod.getInstance().getLang();
 
-        List<String> enabled = config.legendaries.entrySet().stream()
+        List<String> enabled = legendaryConfig.getAll().entrySet().stream()
                 .filter(e -> e.getValue().enabled)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
@@ -87,16 +107,34 @@ public class SpawnController {
                 ? fixedTarget
                 : players.get(ThreadLocalRandom.current().nextInt(players.size()));
 
-        // Reset bonus même sur forcespawn
         LegendarySpawnerMod.getInstance().getChanceTracker().onSpawn();
         LegendarySpawnerMod.getInstance().getChanceTracker().save();
 
-        doSpawn(chosen, target, config.legendaries.get(chosen), lang);
+        doSpawn(chosen, target, legendaryConfig.get(chosen), lang);
+    }
+
+    public void forceSpawnSpecific(String pokemonName, @Nullable ServerPlayerEntity fixedTarget) {
+        tickCounter = 0;
+        LangConfig lang = LegendarySpawnerMod.getInstance().getLang();
+        LegendaryEntry entry = legendaryConfig.get(pokemonName);
+        if (entry == null) return;
+
+        List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
+        if (players.isEmpty()) return;
+
+        ServerPlayerEntity target = fixedTarget != null
+                ? fixedTarget
+                : players.get(ThreadLocalRandom.current().nextInt(players.size()));
+
+        LegendarySpawnerMod.getInstance().getChanceTracker().onSpawn();
+        LegendarySpawnerMod.getInstance().getChanceTracker().save();
+
+        doSpawn(pokemonName, target, entry, lang);
     }
 
     public long getTicksRemaining() { return intervalTicks - tickCounter; }
 
-    // ---- Logique de spawn automatique ----
+    // ---- Spawn automatique ----
 
     private void spawnLegendary(@Nullable ServerPlayerEntity fixedTarget) {
         List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
@@ -105,7 +143,6 @@ public class SpawnController {
         LangConfig lang = LegendarySpawnerMod.getInstance().getLang();
         ChanceTracker tracker = LegendarySpawnerMod.getInstance().getChanceTracker();
 
-        // 1. Roll de la chance globale (unique pour tout le tick)
         double currentChance = tracker.getCurrentChance(config);
         if (ThreadLocalRandom.current().nextDouble() * 100.0 >= currentChance) {
             tracker.onFailedTick(config);
@@ -113,70 +150,105 @@ public class SpawnController {
             return;
         }
 
-        // 2. Construire les candidats éligibles (tous joueurs × tous légendaires)
         List<Candidate> candidates = buildEligibleCandidates(players);
         if (candidates.isEmpty()) {
-            // Le roll est passé mais personne n'est dans le bon biome/conditions
             tracker.onFailedTick(config);
             tracker.save();
             LegendarySpawnerMod.LOGGER.warn(lang.get("spawn.no_eligible"));
             return;
         }
 
-        // 3. Anti-répétition
         List<Candidate> pool = applyAntiRepeat(candidates);
-
-        // 4. Tirage pondéré
         Candidate chosen = weightedPick(pool);
         ServerPlayerEntity target = fixedTarget != null
                 ? fixedTarget
                 : chosen.players().get(ThreadLocalRandom.current().nextInt(chosen.players().size()));
 
-        // 5. Spawn + reset bonus
         tracker.onSpawn();
         tracker.save();
 
-        doSpawn(chosen.name(), target, config.legendaries.get(chosen.name()), lang);
+        doSpawn(chosen.name(), target, legendaryConfig.get(chosen.name()), lang);
     }
 
     private void doSpawn(String pokemonName, ServerPlayerEntity target, LegendaryEntry entry, LangConfig lang) {
         int level = getLevel(entry);
         Vec3d pos = getSpawnPosition(target);
 
-        String cmd = String.format("pokespawn %s level=%d", pokemonName, level);
+        StringBuilder cmd = new StringBuilder(String.format("pokespawn %s level=%d", pokemonName, level));
+
+        // IVs parfaits aléatoires
+        int ivCount = Math.min(Math.max(0, config.perfectIvCount), IV_PROPERTIES.length);
+        if (ivCount > 0) {
+            List<String> pool = new ArrayList<>(Arrays.asList(IV_PROPERTIES));
+            Collections.shuffle(pool, ThreadLocalRandom.current());
+            for (int i = 0; i < ivCount; i++) {
+                cmd.append(" ").append(pool.get(i)).append("=31");
+            }
+        }
+
+        // Shiny
+        boolean shiny = config.shinyChance > 0
+                && ThreadLocalRandom.current().nextDouble() * 100.0 < config.shinyChance;
+        if (shiny) cmd.append(" shiny=true");
+
         server.getCommandManager().executeWithPrefix(
                 server.getCommandSource()
                         .withPosition(pos)
                         .withWorld(target.getServerWorld())
                         .withSilent(),
-                cmd
+                cmd.toString()
         );
 
         recordRecentSpawn(pokemonName);
         cooldownTracker.put(pokemonName, absoluteTick);
         SpawnLogger.log(pokemonName, target, level);
-        broadcastSpawn(target, pokemonName, lang);
+        broadcastSpawn(target, pokemonName, entry, shiny, lang);
+
+        // Stats
+        LegendarySpawnerMod.getInstance().getStats().record(pokemonName, target.getName().getString());
     }
 
-    // ---- Position de spawn autour du joueur ----
+    // ---- Position de spawn au sol ----
 
     private Vec3d getSpawnPosition(ServerPlayerEntity player) {
         double angle = ThreadLocalRandom.current().nextDouble() * 2 * Math.PI;
         int min = config.spawnRadiusMin;
         int max = Math.max(min + 1, config.spawnRadiusMax);
         double radius = min + ThreadLocalRandom.current().nextDouble() * (max - min);
-        return new Vec3d(
-                player.getX() + Math.cos(angle) * radius,
-                player.getY(),
-                player.getZ() + Math.sin(angle) * radius
-        );
+        double x = player.getX() + Math.cos(angle) * radius;
+        double z = player.getZ() + Math.sin(angle) * radius;
+
+        ServerWorld world = player.getServerWorld();
+        int groundY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, (int) x, (int) z);
+
+        return new Vec3d(x, groundY, z);
     }
 
-    // ---- Eligibilité (public pour /nextleg) ----
+    // ---- AFK ----
+
+    private void updateAfkTracking() {
+        for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
+            Vec3d pos  = p.getPos();
+            Vec3d last = afkLastPos.get(p.getUuid());
+            if (last == null || last.squaredDistanceTo(pos) > 0.01) {
+                afkLastPos.put(p.getUuid(), pos);
+                afkSince.put(p.getUuid(), absoluteTick);
+            }
+        }
+    }
+
+    private boolean isAfk(ServerPlayerEntity player) {
+        if (config.ignoreAfkSeconds <= 0) return false;
+        Long since = afkSince.get(player.getUuid());
+        if (since == null) return false;
+        return (absoluteTick - since) >= (long) config.ignoreAfkSeconds * 20;
+    }
+
+    // ---- Éligibilité ----
 
     public List<String> buildEligibleNames(ServerPlayerEntity player) {
         List<String> eligible = new ArrayList<>();
-        for (Map.Entry<String, LegendaryEntry> entry : config.legendaries.entrySet()) {
+        for (Map.Entry<String, LegendaryEntry> entry : legendaryConfig.getAll().entrySet()) {
             LegendaryEntry def = entry.getValue();
             if (!def.enabled) continue;
             if (isOnCooldown(entry.getKey(), def)) continue;
@@ -191,12 +263,13 @@ public class SpawnController {
 
     private List<Candidate> buildEligibleCandidates(List<ServerPlayerEntity> players) {
         List<Candidate> candidates = new ArrayList<>();
-        for (Map.Entry<String, LegendaryEntry> entry : config.legendaries.entrySet()) {
+        for (Map.Entry<String, LegendaryEntry> entry : legendaryConfig.getAll().entrySet()) {
             LegendaryEntry def = entry.getValue();
             if (!def.enabled) continue;
             if (isOnCooldown(entry.getKey(), def)) continue;
 
             List<ServerPlayerEntity> matching = players.stream()
+                    .filter(p -> !isAfk(p))
                     .filter(p -> matchesBiome(def, p))
                     .filter(p -> matchesDimension(def, p))
                     .filter(p -> matchesTimeOfDay(def, p))
@@ -214,21 +287,21 @@ public class SpawnController {
 
     private Candidate weightedPick(List<Candidate> candidates) {
         int total = candidates.stream().mapToInt(Candidate::weight).sum();
-        int roll = ThreadLocalRandom.current().nextInt(total);
-        int cum = 0;
+        int roll  = ThreadLocalRandom.current().nextInt(total);
+        int cum   = 0;
         for (Candidate c : candidates) {
-            cum += c.weight;
+            cum += c.weight();
             if (roll < cum) return c;
         }
         return candidates.get(candidates.size() - 1);
     }
 
     private String weightedPickName(List<String> names) {
-        int total = names.stream().mapToInt(n -> Math.max(1, config.legendaries.get(n).weight)).sum();
-        int roll = ThreadLocalRandom.current().nextInt(total);
-        int cum = 0;
+        int total = names.stream().mapToInt(n -> Math.max(1, legendaryConfig.get(n).weight)).sum();
+        int roll  = ThreadLocalRandom.current().nextInt(total);
+        int cum   = 0;
         for (String name : names) {
-            cum += Math.max(1, config.legendaries.get(name).weight);
+            cum += Math.max(1, legendaryConfig.get(name).weight);
             if (roll < cum) return name;
         }
         return names.get(names.size() - 1);
@@ -237,9 +310,8 @@ public class SpawnController {
     // ---- Anti-répétition ----
 
     private List<Candidate> applyAntiRepeat(List<Candidate> candidates) {
-        if (!config.preventRepeat || config.recentSpawnMemory <= 0 || recentSpawns.isEmpty()) {
+        if (!config.preventRepeat || config.recentSpawnMemory <= 0 || recentSpawns.isEmpty())
             return candidates;
-        }
         List<Candidate> filtered = candidates.stream()
                 .filter(c -> !recentSpawns.contains(c.name()))
                 .collect(Collectors.toList());
@@ -248,9 +320,7 @@ public class SpawnController {
 
     private void recordRecentSpawn(String name) {
         recentSpawns.addFirst(name);
-        while (recentSpawns.size() > Math.max(1, config.recentSpawnMemory)) {
-            recentSpawns.removeLast();
-        }
+        while (recentSpawns.size() > Math.max(1, config.recentSpawnMemory)) recentSpawns.removeLast();
     }
 
     // ---- Cooldown ----
@@ -316,10 +386,12 @@ public class SpawnController {
 
     // ---- Broadcast ----
 
-    private void broadcastSpawn(ServerPlayerEntity target, String pokemonName, LangConfig lang) {
-        String display = formatName(pokemonName);
+    private void broadcastSpawn(ServerPlayerEntity target, String pokemonName,
+                                LegendaryEntry entry, boolean shiny, LangConfig lang) {
+        String display = getDisplayName(pokemonName, entry);
+        String msgKey  = shiny ? "spawn.broadcast_shiny" : "spawn.broadcast";
         server.getPlayerManager().broadcast(
-                Text.literal(lang.get("spawn.broadcast",
+                Text.literal(lang.get(msgKey,
                         "pokemon", display,
                         "player", target.getName().getString())),
                 false
@@ -339,6 +411,14 @@ public class SpawnController {
             p.getServerWorld().playSound(null, p.getBlockPos(),
                     SoundEvents.UI_TOAST_IN, SoundCategory.MASTER, 0.8f, 1.0f);
         }
+    }
+
+    // ---- Utilitaires ----
+
+    public static String getDisplayName(String name, LegendaryEntry entry) {
+        if (entry != null && entry.displayName != null && !entry.displayName.isEmpty())
+            return entry.displayName;
+        return formatName(name);
     }
 
     public static String formatName(String name) {

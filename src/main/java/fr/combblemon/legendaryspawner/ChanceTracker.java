@@ -22,7 +22,8 @@ public class ChanceTracker {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path SAVE_PATH = FabricLoader.getInstance()
             .getConfigDir()
-            .resolve("legendaryspawner-chances.json");
+            .resolve("legendaryspawner")
+            .resolve("chances.json");
 
     private double globalBonus = 0.0;
 
@@ -63,6 +64,7 @@ public class ChanceTracker {
     }
 
     public static ChanceTracker load() {
+        try { java.nio.file.Files.createDirectories(SAVE_PATH.getParent()); } catch (IOException ignored) {}
         ChanceTracker tracker = new ChanceTracker();
         if (Files.exists(SAVE_PATH)) {
             try (Reader reader = new FileReader(SAVE_PATH.toFile())) {

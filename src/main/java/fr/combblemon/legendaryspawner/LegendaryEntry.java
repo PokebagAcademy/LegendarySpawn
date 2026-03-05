@@ -8,6 +8,9 @@ import java.util.List;
  */
 public class LegendaryEntry {
 
+    /** Nom affiché dans les messages (laisser vide pour utiliser le nom formaté automatiquement). */
+    public String displayName = "";
+
     /** Si ce légendaire peut spawner. */
     public boolean enabled = true;
 

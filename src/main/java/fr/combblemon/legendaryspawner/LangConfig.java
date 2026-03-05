@@ -19,7 +19,8 @@ public class LangConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path LANG_PATH = FabricLoader.getInstance()
             .getConfigDir()
-            .resolve("legendaryspawner_lang.json");
+            .resolve("legendaryspawner")
+            .resolve("lang.json");
 
     private Map<String, String> messages = new LinkedHashMap<>();
 
@@ -27,6 +28,7 @@ public class LangConfig {
 
     public static LangConfig load() {
         LangConfig lang = new LangConfig();
+        try { java.nio.file.Files.createDirectories(LANG_PATH.getParent()); } catch (IOException ignored) {}
         lang.loadDefaults();
 
         if (Files.exists(LANG_PATH)) {
@@ -130,21 +132,69 @@ public class LangConfig {
 
         // --- /nextleg ---
         messages.put("nextleg.header",
-                "§6§l[✦] §eProchain Tick Légendaire dans : §b{timer}");
-        messages.put("nextleg.combined_chance",
-                "§eChance d'apparition : §a{chance}%{bonus}");
-        messages.put("nextleg.separator",
-                "§7─────────────────────────");
-        messages.put("nextleg.player_header",
-                "§b[{player}] §7({context})");
-        messages.put("nextleg.eligible_entry",
-                "  §a✔ §e{pokemon}");
-        messages.put("nextleg.no_eligible_player",
-                "  §7Aucun légendaire éligible.");
+                "§6§l[✦] §eDans §b{timer} §7| §eChance : §a{chance}%{bonus}");
+        messages.put("nextleg.eligible_list",
+                "§eÉligibles : §a{list}");
         messages.put("nextleg.own_none",
-                "§7Aucun légendaire éligible pour ta position actuelle.");
-        messages.put("nextleg.total",
-                "§eTotal éligibles: §b{count} §elégendaire(s).");
+                "§eÉligibles : §7aucun (biome/conditions non remplis)");
+        messages.put("nextleg.player_line",
+                "§b[{player}] §7({context}) §8: §a{list}");
+        messages.put("nextleg.player_none",
+                "§b[{player}] §7({context}) §8: §7aucun");
+        messages.put("nextleg.mod_paused",
+                "§7[LegendarySpawner] En pause (moins de {min} joueurs en ligne).");
+
+        // --- Bulk (all) ---
+        messages.put("command.all_enabled",
+                "§6[LS] §a{count} légendaires activés.");
+        messages.put("command.all_disabled",
+                "§6[LS] §c{count} légendaires désactivés.");
+        messages.put("command.all_reset",
+                "§6[LS] §a{count} légendaires réinitialisés (biomes/conditions → any).");
+        messages.put("command.all_biome_set",
+                "§6[LS] §aBiome §e{biome} §aajouté à §e{count} §alégendaires.");
+        messages.put("command.all_biome_cleared",
+                "§6[LS] §cBiomes effacés sur §e{count} §clégendaires.");
+
+        // --- Log ---
+        messages.put("command.help_log",
+                "§e/ls log [lignes] §7- Affiche les derniers spawns (défaut: 10)");
+        messages.put("command.help_log_clear",
+                "§e/ls log clear §7- Efface le fichier de log");
+        messages.put("command.help_stats",
+                "§e/ls stats §7- Statistiques de spawn");
+        messages.put("command.help_forcespawn_pokemon",
+                "§e/ls forcespawn pokemon <nom> [joueur] §7- Force un légendaire précis");
+
+        // --- Stats ---
+        messages.put("command.stats_header",
+                "§6§l=== Stats LegendarySpawner ===");
+        messages.put("command.stats_total",
+                "§eTotal : §a{count} §espawn(s)");
+        messages.put("command.stats_top_pokemon",
+                "§ePlus spawné : §a{value}");
+        messages.put("command.stats_top_player",
+                "§ePlus ciblé : §a{value}");
+        messages.put("command.stats_last",
+                "§eDernier : §c§l{pokemon} §eprès de §b{player} §7({time})");
+        messages.put("command.stats_empty",
+                "§7Aucun spawn enregistré pour le moment.");
+
+        // --- Spawn shiny ---
+        messages.put("spawn.broadcast_shiny",
+                "§6§l[✦ LÉGENDAIRE SHINY] §eUn §d§l✦ {pokemon} §eshiny est apparu près de §b§l{player} §e!");
+        messages.put("command.log_header",
+                "§6§l=== Derniers spawns ({count}) ===");
+        messages.put("command.log_entry",
+                "§7{line}");
+        messages.put("command.log_empty",
+                "§7Aucun spawn enregistré.");
+        messages.put("command.log_disabled",
+                "§c[LS] Le log est désactivé (logSpawns: false dans la config).");
+        messages.put("command.log_cleared",
+                "§6[LS] §aFichier de log effacé.");
+        messages.put("command.log_clear_failed",
+                "§c[LS] Impossible d'effacer le fichier de log.");
 
         // --- Biome ---
         messages.put("command.legendary_biome_added",

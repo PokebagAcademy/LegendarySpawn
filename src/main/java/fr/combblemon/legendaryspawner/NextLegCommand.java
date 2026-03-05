@@ -7,15 +7,14 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static net.minecraft.server.command.CommandManager.literal;
 
 /**
  * /nextleg :
- * - Tous les joueurs (legendaryspawner.nextleg) :
- *     timer + chance globale d'apparition + liste des légendaires éligibles pour ce joueur
- * - Admins (legendaryspawner.nextleg.details) :
- *     idem pour tous les joueurs connectés
+ * - Joueur (legendaryspawner.nextleg) : 2 lignes max — timer/chance + éligibles (liste sur 1 ligne)
+ * - Admin (legendaryspawner.nextleg.details) : idem + 1 ligne par joueur en ligne
  */
 public class NextLegCommand {
 
@@ -36,72 +35,72 @@ public class NextLegCommand {
             return 0;
         }
 
-        ModConfig config       = LegendarySpawnerMod.getInstance().getConfig();
-        ChanceTracker tracker  = LegendarySpawnerMod.getInstance().getChanceTracker();
-        LangConfig lang        = LegendarySpawnerMod.getInstance().getLang();
+        ModConfig config      = LegendarySpawnerMod.getInstance().getConfig();
+        ChanceTracker tracker = LegendarySpawnerMod.getInstance().getChanceTracker();
+        LangConfig lang       = LegendarySpawnerMod.getInstance().getLang();
 
-        long ticks   = ctrl.getTicksRemaining();
-        long secs    = ticks / 20;
+        // --- Timer ---
+        long secs    = ctrl.getTicksRemaining() / 20;
         String timer = secs / 60 + "m" + String.format("%02d", secs % 60) + "s";
 
+        // --- Chance ---
         double currentChance = tracker.getCurrentChance(config);
         double bonus         = tracker.getGlobalBonus();
         String bonusStr      = bonus > 0
-                ? String.format(" §8(base §7%.0f%%§8 +%.0f%% accumulé)", config.spawnChance, bonus)
+                ? String.format(" §8(+%.0f%% acc.)", bonus)
                 : "";
+
+        // --- Mod en pause ? ---
+        if (config.minPlayersToTick > 0) {
+            int online = src.getServer().getPlayerManager().getCurrentPlayerCount();
+            if (online < config.minPlayersToTick) {
+                send(src, lang.get("nextleg.mod_paused", "min", String.valueOf(config.minPlayersToTick)));
+                return 1;
+            }
+        }
 
         boolean isAdmin = PermissionManager.check(src, PermissionManager.NEXTLEG_DETAILS, 2);
         Entity caller   = src.getEntity();
 
+        // Ligne 1 : timer + chance (commune à tous)
+        send(src, lang.get("nextleg.header",
+                "timer", timer,
+                "chance", String.format("%.1f", currentChance),
+                "bonus", bonusStr));
+
         if (isAdmin) {
-            // ── Vue admin : tous les joueurs ──
-            List<ServerPlayerEntity> players = src.getServer().getPlayerManager().getPlayerList();
-
-            send(src, lang.get("nextleg.header", "timer", timer));
-            send(src, lang.get("nextleg.combined_chance",
-                    "chance", String.format("%.1f", currentChance), "bonus", bonusStr));
-            send(src, lang.get("nextleg.separator"));
-
-            for (ServerPlayerEntity player : players) {
+            // ── Vue admin : une ligne par joueur ──
+            for (ServerPlayerEntity player : src.getServer().getPlayerManager().getPlayerList()) {
                 List<String> eligible = ctrl.buildEligibleNames(player);
-                send(src, lang.get("nextleg.player_header",
-                        "player", player.getName().getString(),
-                        "context", buildContextString(player)));
-
                 if (eligible.isEmpty()) {
-                    send(src, lang.get("nextleg.no_eligible_player"));
+                    send(src, lang.get("nextleg.player_none",
+                            "player", player.getName().getString(),
+                            "context", buildContextString(player)));
                 } else {
-                    for (String name : eligible) {
-                        send(src, lang.get("nextleg.eligible_entry",
-                                "pokemon", SpawnController.formatName(name)));
-                    }
+                    send(src, lang.get("nextleg.player_line",
+                            "player", player.getName().getString(),
+                            "context", buildContextString(player),
+                            "list", formatList(eligible)));
                 }
             }
 
         } else if (caller instanceof ServerPlayerEntity player) {
-            // ── Vue joueur : ses propres données ──
+            // ── Vue joueur : ses propres éligibles sur 1 ligne ──
             List<String> eligible = ctrl.buildEligibleNames(player);
-
-            send(src, lang.get("nextleg.header", "timer", timer));
-            send(src, lang.get("nextleg.combined_chance",
-                    "chance", String.format("%.1f", currentChance), "bonus", bonusStr));
-
             if (eligible.isEmpty()) {
                 send(src, lang.get("nextleg.own_none"));
             } else {
-                send(src, lang.get("nextleg.separator"));
-                for (String name : eligible) {
-                    send(src, lang.get("nextleg.eligible_entry",
-                            "pokemon", SpawnController.formatName(name)));
-                }
+                send(src, lang.get("nextleg.eligible_list", "list", formatList(eligible)));
             }
-        } else {
-            send(src, lang.get("nextleg.header", "timer", timer));
-            send(src, lang.get("nextleg.combined_chance",
-                    "chance", String.format("%.1f", currentChance), "bonus", bonusStr));
         }
 
         return 1;
+    }
+
+    private static String formatList(List<String> names) {
+        return names.stream()
+                .map(SpawnController::formatName)
+                .collect(Collectors.joining("§7, §a"));
     }
 
     private static String buildContextString(ServerPlayerEntity player) {
@@ -112,11 +111,11 @@ public class NextLegCommand {
             case "minecraft:the_end"    -> "end";
             default -> dim;
         };
-        String timeStr = player.getServerWorld().isDay() ? "jour" : "nuit";
+        String timeStr    = player.getServerWorld().isDay() ? "jour" : "nuit";
         String weatherStr;
-        if (player.getServerWorld().isThundering())      weatherStr = "orage";
-        else if (player.getServerWorld().isRaining())    weatherStr = "pluie";
-        else                                              weatherStr = "clair";
+        if (player.getServerWorld().isThundering())   weatherStr = "orage";
+        else if (player.getServerWorld().isRaining()) weatherStr = "pluie";
+        else                                           weatherStr = "clair";
         return dimStr + " • " + timeStr + " • " + weatherStr;
     }
 
