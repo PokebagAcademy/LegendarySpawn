@@ -22,7 +22,7 @@ public class SpawnController {
     private boolean running = false;
 
     private static final List<String> ALL_LEGENDARIES = List.of(
-            "mewtwo", "mew", "lugia", "ho_oh", "celebi",
+            "mewtwo", "mew", "lugia", "hooh", "celebi",
             "regirock", "regice", "registeel", "latias", "latios",
             "kyogre", "groudon", "rayquaza", "jirachi", "deoxys",
             "uxie", "mesprit", "azelf", "dialga", "palkia",
@@ -30,7 +30,15 @@ public class SpawnController {
             "shaymin", "arceus", "victini", "cobalion", "terrakion",
             "virizion", "reshiram", "zekrom", "kyurem", "xerneas",
             "yveltal", "zygarde", "solgaleo", "lunala", "necrozma",
-            "zacian", "zamazenta", "eternatus", "koraidon", "miraidon"
+            "zacian", "zamazenta", "eternatus", "koraidon", "miraidon",
+            "raikou", "entei", "suicune", "manaphy", "phione", "keldeo",
+            "meoletta", "genesect", "diancie", "hoopa", "volcanion",
+            "tapulele", "tapukoko", "tapubulu", "tapufini", "magearna",
+            "marshadow", "zeraora", "kubfu", "regieleki", "regidrago",
+            "glastrier", "spectrier", "calyrex", "enamorus", "zarude",
+            "meltan", "okidogi", "munkidori", "fezandipiti", "ogerpon",
+            "terapagos", "pecharunt", "wochien", "chienpao", "tinglu",
+            "chiyu"
     );
 
     public SpawnController(MinecraftServer server, ModConfig config) {
