@@ -52,21 +52,39 @@ public class LegendaryCommand {
 
     private static final SuggestionProvider<ServerCommandSource> VALUE_SUGGESTIONS =
             (ctx, builder) -> {
+                // Resolve param: try context first, fall back to scanning raw input tokens
+                String param = null;
                 try {
-                    String param = StringArgumentType.getString(ctx, "param").toLowerCase();
-                    switch (param) {
-                        case "timeofday"           -> VALID_TIMEOFDAY.forEach(builder::suggest);
-                        case "weather"             -> VALID_WEATHER.forEach(builder::suggest);
-                        case "dimension"           -> {
-                            VALID_DIMENSION.forEach(builder::suggest);
-                            ctx.getSource().getServer().getWorldRegistryKeys()
-                                    .stream().map(k -> k.getValue().toString()).forEach(builder::suggest);
-                        }
-                        case "weight"              -> List.of("1","2","5","10").forEach(builder::suggest);
-                        case "cooldown"            -> List.of("0","30","60","120").forEach(builder::suggest);
-                        case "minlevel","maxlevel" -> List.of("-1","50","70","100").forEach(builder::suggest);
-                    }
+                    param = StringArgumentType.getString(ctx, "param").toLowerCase();
                 } catch (Exception ignored) {}
+                if (param == null) {
+                    for (String token : builder.getInput().trim().split("\\s+"))
+                        if (VALID_SET_PARAMS.contains(token.toLowerCase()))
+                            param = token.toLowerCase();
+                }
+                if (param == null) return builder.buildFuture();
+
+                String remaining = builder.getRemaining().toLowerCase();
+                switch (param) {
+                    case "timeofday" -> VALID_TIMEOFDAY.stream()
+                            .filter(v -> v.startsWith(remaining)).forEach(builder::suggest);
+                    case "weather"   -> VALID_WEATHER.stream()
+                            .filter(v -> v.startsWith(remaining)).forEach(builder::suggest);
+                    case "dimension" -> {
+                        VALID_DIMENSION.stream()
+                                .filter(v -> v.startsWith(remaining)).forEach(builder::suggest);
+                        ctx.getSource().getServer().getWorldRegistryKeys().stream()
+                                .map(k -> k.getValue().toString())
+                                .filter(v -> remaining.isEmpty() || v.contains(remaining))
+                                .forEach(builder::suggest);
+                    }
+                    case "weight"              -> List.of("1","2","5","10").stream()
+                            .filter(v -> v.startsWith(remaining)).forEach(builder::suggest);
+                    case "cooldown"            -> List.of("0","30","60","120").stream()
+                            .filter(v -> v.startsWith(remaining)).forEach(builder::suggest);
+                    case "minlevel","maxlevel" -> List.of("-1","50","70","100").stream()
+                            .filter(v -> v.startsWith(remaining)).forEach(builder::suggest);
+                }
                 return builder.buildFuture();
             };
 
