@@ -460,7 +460,14 @@ public class LegendaryCommand {
                 case "cooldown"    -> { int c = Integer.parseInt(value); if (c < 0) throw new IllegalArgumentException(); entry.cooldownMinutes = c; }
                 case "timeofday"   -> { if (!VALID_TIMEOFDAY.contains(value.toLowerCase())) throw new IllegalArgumentException(); entry.timeOfDay = value.toLowerCase(); }
                 case "weather"     -> { if (!VALID_WEATHER.contains(value.toLowerCase())) throw new IllegalArgumentException(); entry.weather = value.toLowerCase(); }
-                case "dimension"   -> { if (!VALID_DIMENSION.contains(value.toLowerCase())) throw new IllegalArgumentException(); entry.dimension = value.toLowerCase(); }
+                case "dimension"   -> {
+                    String v = value.toLowerCase();
+                    boolean validDim = VALID_DIMENSION.contains(v)
+                            || src.getServer().getWorldRegistryKeys().stream()
+                                .anyMatch(k -> k.getValue().toString().equals(v));
+                    if (!validDim) throw new IllegalArgumentException();
+                    entry.dimension = v;
+                }
                 case "displayname" -> entry.displayName = value;
                 default -> { send(src, lang.get("command.legendary_set_unknown_param", "param", param)); return 0; }
             }
