@@ -13,7 +13,7 @@ import java.util.Map;
 
 public class ModConfig {
 
-    // ---- Légendaires connus ----
+    // ---- Liste de référence de tous les légendaires/mythiques connus ----
 
     public static final List<String> ALL_LEGENDARIES = List.of(
             // Gen 1
@@ -55,11 +55,34 @@ public class ModConfig {
     /** Intervalle en minutes entre chaque spawn. */
     public int intervalMinutes = 30;
 
-    /** Niveau des légendaires qui spawnent. */
+    /** Niveau par défaut des légendaires (utilisé si minLevel/maxLevel non définis). */
     public int legendaryLevel = 70;
 
     /**
-     * Configuration par légendaire.
+     * Minutes avant le spawn pour envoyer une annonce de prévention.
+     * 0 = désactivé.
+     */
+    public int warnMinutesBefore = 5;
+
+    /**
+     * Empêche le même légendaire de spawner plusieurs fois de suite.
+     * Fonctionne avec recentSpawnMemory.
+     */
+    public boolean preventRepeat = true;
+
+    /**
+     * Nombre de spawns récents mémorisés pour l'anti-répétition.
+     * Ex: 3 = les 3 derniers légendaires spawnés sont exclus du tirage.
+     */
+    public int recentSpawnMemory = 3;
+
+    /**
+     * Enregistre chaque spawn dans logs/legendaryspawner-spawns.log.
+     */
+    public boolean logSpawns = true;
+
+    /**
+     * Configuration individuelle par légendaire.
      * Clé = nom du Pokémon (ex: "mewtwo"), valeur = ses paramètres de spawn.
      */
     public Map<String, LegendaryEntry> legendaries = new LinkedHashMap<>();

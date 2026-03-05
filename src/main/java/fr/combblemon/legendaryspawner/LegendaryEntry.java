@@ -36,8 +36,26 @@ public class LegendaryEntry {
     public String dimension = "any";
 
     /**
-     * Poids relatif de spawn (plus élevé = plus fréquent).
-     * Minimum : 1.
+     * Poids relatif de spawn (plus élevé = plus fréquent). Minimum : 1.
      */
     public int weight = 1;
+
+    /**
+     * Niveau minimum du légendaire. -1 = utilise le legendaryLevel global.
+     * Si seul minLevel est défini (maxLevel = -1), ce niveau est utilisé exactement.
+     */
+    public int minLevel = -1;
+
+    /**
+     * Niveau maximum du légendaire. -1 = utilise le legendaryLevel global.
+     * Si seul maxLevel est défini (minLevel = -1), ce niveau est utilisé exactement.
+     * Si les deux sont définis, un niveau aléatoire entre minLevel et maxLevel est choisi.
+     */
+    public int maxLevel = -1;
+
+    /**
+     * Cooldown en minutes avant que ce légendaire puisse respawner.
+     * 0 = aucun cooldown.
+     */
+    public int cooldownMinutes = 0;
 }

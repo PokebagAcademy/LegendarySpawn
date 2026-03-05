@@ -51,42 +51,92 @@ public class LangConfig {
                 "§6§l[✦ LÉGENDAIRE] §eUn §c§l{pokemon} §eest apparu près de §b§l{player} §e!");
         messages.put("spawn.notify_player",
                 "§6✦ §eUn légendaire §c§l{pokemon} §eest apparu à côté de toi !");
+        messages.put("spawn.warn",
+                "§6§l[✦ LÉGENDAIRE] §eUn légendaire apparaîtra dans §b{minutes} minute(s) §e! Soyez prêts !");
         messages.put("spawn.no_eligible",
-                "§c[LegendarySpawner] Aucun légendaire éligible pour les joueurs connectés (biomes/conditions non remplies).");
+                "§c[LegendarySpawner] Aucun légendaire éligible (biomes/conditions/cooldowns non remplis). Spawn ignoré.");
+        messages.put("spawn.no_enabled",
+                "§c[LegendarySpawner] Aucun légendaire activé. Spawn ignoré.");
 
         // --- Commandes générales ---
         messages.put("command.not_initialized",
                 "§cLe mod n'est pas encore initialisé.");
         messages.put("command.force_spawn",
                 "§6[LS] §eForçage du spawn d'un légendaire...");
+        messages.put("command.force_spawn_player",
+                "§6[LS] §eForçage du spawn d'un légendaire sur §b{player}§e...");
         messages.put("command.reload_success",
-                "§6[LS] §aConfig et lang rechargées, timer reset !");
+                "§6[LS] §aConfig et lang rechargées ! (timer préservé)");
         messages.put("command.set_interval",
                 "§6[LS] §aIntervalle mis à §e{minutes} §aminutes !");
         messages.put("command.timer",
                 "§6[LS] §eProchain spawn dans §b{minutes} min {seconds} sec§e.");
 
         // --- Aide ---
-        messages.put("command.help_header",      "§6§l=== LegendarySpawner ===");
-        messages.put("command.help_forcespawn",  "§e/ls forcespawn §7- Force un spawn immédiat");
-        messages.put("command.help_reload",      "§e/ls reload §7- Recharge la config et le lang");
-        messages.put("command.help_setinterval", "§e/ls setinterval <min> §7- Change l'intervalle");
-        messages.put("command.help_timer",       "§e/ls timer §7- Temps restant avant prochain spawn");
-        messages.put("command.help_legendary",   "§e/ls legendary <list|enable|disable> §7- Gère les légendaires");
+        messages.put("command.help_header",        "§6§l=== LegendarySpawner ===");
+        messages.put("command.help_forcespawn",    "§e/ls forcespawn [joueur] §7- Force un spawn (sur un joueur optionnel)");
+        messages.put("command.help_reload",        "§e/ls reload §7- Recharge la config et le lang");
+        messages.put("command.help_setinterval",   "§e/ls setinterval <min> §7- Change l'intervalle");
+        messages.put("command.help_timer",         "§e/ls timer §7- Temps restant avant prochain spawn");
+        messages.put("command.help_legendary",     "§e/ls legendary <list|info|enable|disable|set|biome> §7- Gère les légendaires");
 
-        // --- Gestion des légendaires ---
+        // --- Liste ---
+        messages.put("command.legendary_list_header",
+                "§6§l=== Légendaires (page {page}/{total}) ===");
+        messages.put("command.legendary_list_entry_enabled",
+                "§a✔ §e{pokemon} §7(poids:{weight} niv:{level} cd:{cooldown}min)");
+        messages.put("command.legendary_list_entry_disabled",
+                "§c✘ §7{pokemon}");
+        messages.put("command.legendary_list_page_hint",
+                "§7/ls legendary list <page> pour naviguer.");
+
+        // --- Info ---
+        messages.put("command.legendary_info_header",
+                "§6§l=== {pokemon} ===");
+        messages.put("command.legendary_info_enabled",
+                "§eActivé: §a{value}");
+        messages.put("command.legendary_info_weight",
+                "§ePoids: §a{value}");
+        messages.put("command.legendary_info_level",
+                "§eNiveau: §a{value}");
+        messages.put("command.legendary_info_cooldown",
+                "§eCooldown: §a{value} min");
+        messages.put("command.legendary_info_timeofday",
+                "§eHeure: §a{value}");
+        messages.put("command.legendary_info_weather",
+                "§eMétéo: §a{value}");
+        messages.put("command.legendary_info_dimension",
+                "§eDimension: §a{value}");
+        messages.put("command.legendary_info_biomes",
+                "§eBiomes: §a{value}");
+
+        // --- Enable/Disable ---
         messages.put("command.legendary_enabled",
                 "§6[LS] §a{pokemon} §aactivé.");
         messages.put("command.legendary_disabled",
                 "§6[LS] §c{pokemon} §cdésactivé.");
         messages.put("command.legendary_not_found",
                 "§c[LS] Légendaire §e{pokemon} §cinconnu dans la config.");
-        messages.put("command.legendary_list_header",
-                "§6§l=== Légendaires configurés ===");
-        messages.put("command.legendary_list_entry_enabled",
-                "§a✔ §e{pokemon} §7(poids: {weight})");
-        messages.put("command.legendary_list_entry_disabled",
-                "§c✘ §7{pokemon} §8(désactivé)");
+
+        // --- Set ---
+        messages.put("command.legendary_set_success",
+                "§6[LS] §a{pokemon}.{param} §a= §e{value}");
+        messages.put("command.legendary_set_invalid",
+                "§c[LS] Valeur invalide pour §e{param}§c: §e{value}");
+        messages.put("command.legendary_set_unknown_param",
+                "§c[LS] Paramètre inconnu: §e{param}§c. Valides: weight, minlevel, maxlevel, cooldown, timeofday, weather, dimension");
+
+        // --- Biome ---
+        messages.put("command.legendary_biome_added",
+                "§6[LS] §aBiome §e{biome} §aajouté à §e{pokemon}§a.");
+        messages.put("command.legendary_biome_already",
+                "§c[LS] §e{biome} §cest déjà configuré pour §e{pokemon}§c.");
+        messages.put("command.legendary_biome_removed",
+                "§6[LS] §cBiome §e{biome} §cretirée de §e{pokemon}§c.");
+        messages.put("command.legendary_biome_not_found",
+                "§c[LS] Biome §e{biome} §cnon trouvé dans la config de §e{pokemon}§c.");
+        messages.put("command.legendary_biome_cleared",
+                "§6[LS] §cTous les biomes de §e{pokemon} §ceffacés (n'importe quel biome accepté).");
     }
 
     public void save() {
