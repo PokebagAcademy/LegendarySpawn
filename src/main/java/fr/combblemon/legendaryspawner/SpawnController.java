@@ -21,12 +21,15 @@ public class SpawnController {
     private ModConfig config;
 
     private long tickCounter = 0;
-    private long absoluteTick = 0;   // ne remet jamais à 0 (pour les cooldowns)
+    private long absoluteTick = 0;
     private long intervalTicks;
     private boolean running = false;
 
     private final LinkedList<String> recentSpawns = new LinkedList<>();
     private final Map<String, Long> cooldownTracker = new HashMap<>();
+
+    /** Groupe légendaire + joueurs compatibles + poids */
+    private record Candidate(String name, List<ServerPlayerEntity> players, int weight) {}
 
     public SpawnController(MinecraftServer server, ModConfig config) {
         this.server = server;
@@ -37,7 +40,6 @@ public class SpawnController {
     public void start() { running = true; tickCounter = 0; }
     public void stop()  { running = false; }
 
-    /** Met à jour la config sans remettre le timer à zéro. */
     public void updateConfig(ModConfig newConfig) {
         this.config = newConfig;
         this.intervalTicks = (long) newConfig.intervalMinutes * 60 * 20;
@@ -62,10 +64,7 @@ public class SpawnController {
         }
     }
 
-    /**
-     * Force un spawn immédiat. Bypass les conditions biome/météo/heure et les rolls de chance.
-     * @param fixedTarget joueur cible, ou null pour un joueur aléatoire.
-     */
+    /** Force un spawn : bypass chance globale et conditions, respect du joueur cible si fourni. */
     public void forceSpawn(@Nullable ServerPlayerEntity fixedTarget) {
         tickCounter = 0;
         List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
@@ -73,7 +72,6 @@ public class SpawnController {
 
         LangConfig lang = LegendarySpawnerMod.getInstance().getLang();
 
-        // Tous les légendaires activés, avec poids — sans conditions ni chance
         List<String> enabled = config.legendaries.entrySet().stream()
                 .filter(e -> e.getValue().enabled)
                 .map(Map.Entry::getKey)
@@ -89,6 +87,10 @@ public class SpawnController {
                 ? fixedTarget
                 : players.get(ThreadLocalRandom.current().nextInt(players.size()));
 
+        // Reset bonus même sur forcespawn
+        LegendarySpawnerMod.getInstance().getChanceTracker().onSpawn();
+        LegendarySpawnerMod.getInstance().getChanceTracker().save();
+
         doSpawn(chosen, target, config.legendaries.get(chosen), lang);
     }
 
@@ -103,58 +105,48 @@ public class SpawnController {
         LangConfig lang = LegendarySpawnerMod.getInstance().getLang();
         ChanceTracker tracker = LegendarySpawnerMod.getInstance().getChanceTracker();
 
-        // 1. Choisir un joueur aléatoire
-        ServerPlayerEntity candidate = fixedTarget != null
-                ? fixedTarget
-                : players.get(ThreadLocalRandom.current().nextInt(players.size()));
-
-        // 2. Trouver les légendaires éligibles pour ce joueur (conditions + cooldown)
-        List<String> eligible = buildEligibleNames(candidate);
-        if (eligible.isEmpty()) return;
-
-        // 3. Anti-répétition
-        List<String> pool = applyAntiRepeat(eligible);
-
-        // 4. Roll de chance pour chaque légendaire du pool
-        List<String> successes = pool.stream()
-                .filter(name -> {
-                    double chance = tracker.getCurrentChance(name, config.legendaries.get(name), config);
-                    return ThreadLocalRandom.current().nextDouble() * 100.0 < chance;
-                })
-                .collect(Collectors.toList());
-
-        if (successes.isEmpty()) {
-            // Aucun légendaire n'a passé le roll → on incrémente les bonus des éligibles
-            for (String name : eligible) {
-                tracker.incrementBonus(name, config.legendaries.get(name), config);
-            }
+        // 1. Roll de la chance globale (unique pour tout le tick)
+        double currentChance = tracker.getCurrentChance(config);
+        if (ThreadLocalRandom.current().nextDouble() * 100.0 >= currentChance) {
+            tracker.onFailedTick(config);
             tracker.save();
             return;
         }
 
-        // 5. Tirage pondéré parmi les succès
-        String chosen = weightedPickName(successes);
-
-        // 6. Reset du bonus du gagnant, incrément des autres éligibles
-        tracker.resetBonus(chosen);
-        for (String name : eligible) {
-            if (!name.equals(chosen)) {
-                tracker.incrementBonus(name, config.legendaries.get(name), config);
-            }
+        // 2. Construire les candidats éligibles (tous joueurs × tous légendaires)
+        List<Candidate> candidates = buildEligibleCandidates(players);
+        if (candidates.isEmpty()) {
+            // Le roll est passé mais personne n'est dans le bon biome/conditions
+            tracker.onFailedTick(config);
+            tracker.save();
+            LegendarySpawnerMod.LOGGER.warn(lang.get("spawn.no_eligible"));
+            return;
         }
+
+        // 3. Anti-répétition
+        List<Candidate> pool = applyAntiRepeat(candidates);
+
+        // 4. Tirage pondéré
+        Candidate chosen = weightedPick(pool);
+        ServerPlayerEntity target = fixedTarget != null
+                ? fixedTarget
+                : chosen.players().get(ThreadLocalRandom.current().nextInt(chosen.players().size()));
+
+        // 5. Spawn + reset bonus
+        tracker.onSpawn();
         tracker.save();
 
-        doSpawn(chosen, candidate, config.legendaries.get(chosen), lang);
+        doSpawn(chosen.name(), target, config.legendaries.get(chosen.name()), lang);
     }
 
     private void doSpawn(String pokemonName, ServerPlayerEntity target, LegendaryEntry entry, LangConfig lang) {
         int level = getLevel(entry);
-        Vec3d spawnPos = getSpawnPosition(target);
+        Vec3d pos = getSpawnPosition(target);
 
         String cmd = String.format("pokespawn %s level=%d", pokemonName, level);
         server.getCommandManager().executeWithPrefix(
                 server.getCommandSource()
-                        .withPosition(spawnPos)
+                        .withPosition(pos)
                         .withWorld(target.getServerWorld())
                         .withSilent(),
                 cmd
@@ -182,10 +174,6 @@ public class SpawnController {
 
     // ---- Eligibilité (public pour /nextleg) ----
 
-    /**
-     * Retourne la liste des noms de légendaires éligibles pour un joueur donné.
-     * Tient compte des conditions (biome, météo, heure, dimension) et des cooldowns.
-     */
     public List<String> buildEligibleNames(ServerPlayerEntity player) {
         List<String> eligible = new ArrayList<>();
         for (Map.Entry<String, LegendaryEntry> entry : config.legendaries.entrySet()) {
@@ -201,29 +189,61 @@ public class SpawnController {
         return eligible;
     }
 
+    private List<Candidate> buildEligibleCandidates(List<ServerPlayerEntity> players) {
+        List<Candidate> candidates = new ArrayList<>();
+        for (Map.Entry<String, LegendaryEntry> entry : config.legendaries.entrySet()) {
+            LegendaryEntry def = entry.getValue();
+            if (!def.enabled) continue;
+            if (isOnCooldown(entry.getKey(), def)) continue;
+
+            List<ServerPlayerEntity> matching = players.stream()
+                    .filter(p -> matchesBiome(def, p))
+                    .filter(p -> matchesDimension(def, p))
+                    .filter(p -> matchesTimeOfDay(def, p))
+                    .filter(p -> matchesWeather(def, p))
+                    .collect(Collectors.toList());
+
+            if (!matching.isEmpty()) {
+                candidates.add(new Candidate(entry.getKey(), matching, Math.max(1, def.weight)));
+            }
+        }
+        return candidates;
+    }
+
     // ---- Sélection pondérée ----
+
+    private Candidate weightedPick(List<Candidate> candidates) {
+        int total = candidates.stream().mapToInt(Candidate::weight).sum();
+        int roll = ThreadLocalRandom.current().nextInt(total);
+        int cum = 0;
+        for (Candidate c : candidates) {
+            cum += c.weight;
+            if (roll < cum) return c;
+        }
+        return candidates.get(candidates.size() - 1);
+    }
 
     private String weightedPickName(List<String> names) {
         int total = names.stream().mapToInt(n -> Math.max(1, config.legendaries.get(n).weight)).sum();
         int roll = ThreadLocalRandom.current().nextInt(total);
-        int cumulative = 0;
+        int cum = 0;
         for (String name : names) {
-            cumulative += Math.max(1, config.legendaries.get(name).weight);
-            if (roll < cumulative) return name;
+            cum += Math.max(1, config.legendaries.get(name).weight);
+            if (roll < cum) return name;
         }
         return names.get(names.size() - 1);
     }
 
     // ---- Anti-répétition ----
 
-    private List<String> applyAntiRepeat(List<String> eligible) {
+    private List<Candidate> applyAntiRepeat(List<Candidate> candidates) {
         if (!config.preventRepeat || config.recentSpawnMemory <= 0 || recentSpawns.isEmpty()) {
-            return eligible;
+            return candidates;
         }
-        List<String> filtered = eligible.stream()
-                .filter(n -> !recentSpawns.contains(n))
+        List<Candidate> filtered = candidates.stream()
+                .filter(c -> !recentSpawns.contains(c.name()))
                 .collect(Collectors.toList());
-        return filtered.isEmpty() ? eligible : filtered;
+        return filtered.isEmpty() ? candidates : filtered;
     }
 
     private void recordRecentSpawn(String name) {
@@ -245,8 +265,7 @@ public class SpawnController {
     // ---- Niveau ----
 
     private int getLevel(LegendaryEntry entry) {
-        int min = entry.minLevel;
-        int max = entry.maxLevel;
+        int min = entry.minLevel, max = entry.maxLevel;
         if (min < 0 && max < 0) return config.legendaryLevel;
         if (min < 0) return max;
         if (max < 0) return min;
@@ -321,8 +340,6 @@ public class SpawnController {
                     SoundEvents.UI_TOAST_IN, SoundCategory.MASTER, 0.8f, 1.0f);
         }
     }
-
-    // ---- Utilitaire (public pour /nextleg et SpawnLogger) ----
 
     public static String formatName(String name) {
         String[] parts = name.split("_");

@@ -27,7 +27,6 @@ public class LegendaryCommand {
     private static final List<String> VALID_DIMENSION  = List.of("any", "overworld", "nether", "end");
     private static final List<String> VALID_SET_PARAMS = List.of(
             "weight", "minlevel", "maxlevel", "cooldown",
-            "spawnchance", "chanceincrement", "maxchance",
             "timeofday", "weather", "dimension");
 
     // ---- Helpers de permission ----
@@ -56,12 +55,9 @@ public class LegendaryCommand {
                         case "timeofday"       -> VALID_TIMEOFDAY.forEach(builder::suggest);
                         case "weather"         -> VALID_WEATHER.forEach(builder::suggest);
                         case "dimension"       -> VALID_DIMENSION.forEach(builder::suggest);
-                        case "weight"          -> List.of("1","2","5","10").forEach(builder::suggest);
-                        case "cooldown"        -> List.of("0","30","60","120").forEach(builder::suggest);
+                        case "weight"              -> List.of("1","2","5","10").forEach(builder::suggest);
+                        case "cooldown"            -> List.of("0","30","60","120").forEach(builder::suggest);
                         case "minlevel","maxlevel" -> List.of("-1","50","70","100").forEach(builder::suggest);
-                        case "spawnchance"     -> List.of("-1","10","25","50","100").forEach(builder::suggest);
-                        case "chanceincrement" -> List.of("-1","0","5","10","25").forEach(builder::suggest);
-                        case "maxchance"       -> List.of("-1","50","75","100").forEach(builder::suggest);
                     }
                 } catch (Exception ignored) {}
                 return builder.buildFuture();
@@ -274,7 +270,6 @@ public class LegendaryCommand {
     private static int handleList(ServerCommandSource source, int page) {
         ModConfig cfg = LegendarySpawnerMod.getInstance().getConfig();
         LangConfig lang = LegendarySpawnerMod.getInstance().getLang();
-        ChanceTracker tracker = LegendarySpawnerMod.getInstance().getChanceTracker();
 
         List<Map.Entry<String, LegendaryEntry>> entries = new ArrayList<>(cfg.legendaries.entrySet());
         int totalPages = (int) Math.ceil((double) entries.size() / PAGE_SIZE);
@@ -289,13 +284,11 @@ public class LegendaryCommand {
             String name = e.getKey();
             LegendaryEntry entry = e.getValue();
             if (entry.enabled) {
-                double currentChance = tracker.getCurrentChance(name, entry, cfg);
                 send(source, lang.get("command.legendary_list_entry_enabled",
                         "pokemon", name,
                         "weight", String.valueOf(entry.weight),
                         "level", buildLevelString(entry, cfg.legendaryLevel),
-                        "cooldown", String.valueOf(entry.cooldownMinutes),
-                        "chance", String.format("%.1f", currentChance)));
+                        "cooldown", String.valueOf(entry.cooldownMinutes)));
             } else {
                 send(source, lang.get("command.legendary_list_entry_disabled", "pokemon", name));
             }
@@ -307,13 +300,9 @@ public class LegendaryCommand {
     private static int handleInfo(ServerCommandSource source, String name) {
         ModConfig cfg = LegendarySpawnerMod.getInstance().getConfig();
         LangConfig lang = LegendarySpawnerMod.getInstance().getLang();
-        ChanceTracker tracker = LegendarySpawnerMod.getInstance().getChanceTracker();
 
         LegendaryEntry entry = cfg.legendaries.get(name);
         if (entry == null) { send(source, lang.get("command.legendary_not_found", "pokemon", name)); return 0; }
-
-        double currentChance = tracker.getCurrentChance(name, entry, cfg);
-        double bonus = tracker.getBonus(name);
 
         send(source, lang.get("command.legendary_info_header", "pokemon", SpawnController.formatName(name)));
         send(source, lang.get("command.legendary_info_enabled",  "value", String.valueOf(entry.enabled)));
@@ -325,16 +314,6 @@ public class LegendaryCommand {
         send(source, lang.get("command.legendary_info_dimension","value", entry.dimension));
         send(source, lang.get("command.legendary_info_biomes",   "value",
                 entry.biomes.isEmpty() ? "any" : String.join(", ", entry.biomes)));
-        // Chances
-        double base = entry.spawnChance >= 0 ? entry.spawnChance : cfg.defaultSpawnChance;
-        double max  = entry.maxChance  >= 0 ? entry.maxChance  : cfg.defaultMaxChance;
-        double incr = entry.chanceIncrement >= 0 ? entry.chanceIncrement : cfg.defaultChanceIncrement;
-        send(source, lang.get("command.legendary_info_chance",
-                "base", String.format("%.1f", base),
-                "current", String.format("%.1f", currentChance),
-                "bonus", String.format("%.1f", bonus),
-                "max", String.format("%.1f", max),
-                "increment", String.format("%.1f", incr)));
         return 1;
     }
 
@@ -363,16 +342,13 @@ public class LegendaryCommand {
 
         try {
             switch (param) {
-                case "weight"          -> { int w = Integer.parseInt(value); if (w < 1) throw new IllegalArgumentException(); entry.weight = w; }
-                case "minlevel"        -> { int l = Integer.parseInt(value); if (l < -1 || l > 100) throw new IllegalArgumentException(); entry.minLevel = l; }
-                case "maxlevel"        -> { int l = Integer.parseInt(value); if (l < -1 || l > 100) throw new IllegalArgumentException(); entry.maxLevel = l; }
-                case "cooldown"        -> { int c = Integer.parseInt(value); if (c < 0) throw new IllegalArgumentException(); entry.cooldownMinutes = c; }
-                case "spawnchance"     -> { double d = Double.parseDouble(value); if (d < -1 || d > 100) throw new IllegalArgumentException(); entry.spawnChance = d; }
-                case "chanceincrement" -> { double d = Double.parseDouble(value); if (d < -1) throw new IllegalArgumentException(); entry.chanceIncrement = d; }
-                case "maxchance"       -> { double d = Double.parseDouble(value); if (d < -1 || d > 100) throw new IllegalArgumentException(); entry.maxChance = d; }
-                case "timeofday"       -> { if (!VALID_TIMEOFDAY.contains(value.toLowerCase())) throw new IllegalArgumentException(); entry.timeOfDay = value.toLowerCase(); }
-                case "weather"         -> { if (!VALID_WEATHER.contains(value.toLowerCase())) throw new IllegalArgumentException(); entry.weather = value.toLowerCase(); }
-                case "dimension"       -> { if (!VALID_DIMENSION.contains(value.toLowerCase())) throw new IllegalArgumentException(); entry.dimension = value.toLowerCase(); }
+                case "weight"    -> { int w = Integer.parseInt(value); if (w < 1) throw new IllegalArgumentException(); entry.weight = w; }
+                case "minlevel"  -> { int l = Integer.parseInt(value); if (l < -1 || l > 100) throw new IllegalArgumentException(); entry.minLevel = l; }
+                case "maxlevel"  -> { int l = Integer.parseInt(value); if (l < -1 || l > 100) throw new IllegalArgumentException(); entry.maxLevel = l; }
+                case "cooldown"  -> { int c = Integer.parseInt(value); if (c < 0) throw new IllegalArgumentException(); entry.cooldownMinutes = c; }
+                case "timeofday" -> { if (!VALID_TIMEOFDAY.contains(value.toLowerCase())) throw new IllegalArgumentException(); entry.timeOfDay = value.toLowerCase(); }
+                case "weather"   -> { if (!VALID_WEATHER.contains(value.toLowerCase())) throw new IllegalArgumentException(); entry.weather = value.toLowerCase(); }
+                case "dimension" -> { if (!VALID_DIMENSION.contains(value.toLowerCase())) throw new IllegalArgumentException(); entry.dimension = value.toLowerCase(); }
                 default -> { send(src, lang.get("command.legendary_set_unknown_param", "param", param)); return 0; }
             }
         } catch (IllegalArgumentException e) {

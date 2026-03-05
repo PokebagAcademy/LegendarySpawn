@@ -130,15 +130,15 @@ public class LangConfig {
 
         // --- /nextleg ---
         messages.put("nextleg.header",
-                "§6§l[✦] §eProchain Tick Légendaire dans : §b{minutes}m{seconds}s");
+                "§6§l[✦] §eProchain Tick Légendaire dans : §b{timer}");
         messages.put("nextleg.combined_chance",
-                "§eChance d'apparition : §a{chance}%");
+                "§eChance d'apparition : §a{chance}%{bonus}");
         messages.put("nextleg.separator",
                 "§7─────────────────────────");
         messages.put("nextleg.player_header",
-                "§b[{player}] §7({context}) §e→ §a{combined}% d'apparition");
+                "§b[{player}] §7({context})");
         messages.put("nextleg.eligible_entry",
-                "  §a✔ §e{pokemon} §7→ §a{chance}%{bonus}");
+                "  §a✔ §e{pokemon}");
         messages.put("nextleg.no_eligible_player",
                 "  §7Aucun légendaire éligible.");
         messages.put("nextleg.own_none",

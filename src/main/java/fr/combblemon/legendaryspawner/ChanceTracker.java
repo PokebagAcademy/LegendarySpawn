@@ -2,79 +2,61 @@ package fr.combblemon.legendaryspawner;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.*;
-import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
- * Suit l'accumulation des bonus de chance par légendaire.
- * Persiste dans config/legendaryspawner-chances.json pour survivre aux redémarrages.
+ * Suit le bonus de chance global accumulé entre les ticks.
  *
  * Fonctionnement :
- * - Chaque légendaire a un bonus accumulé (en %) qui s'ajoute à son spawnChance de base.
- * - Le bonus augmente chaque cycle où le légendaire était éligible mais n'a pas spawné.
- * - Le bonus est remis à 0 quand le légendaire spawne.
- * - Le bonus ne peut pas dépasser maxChance - spawnChance.
+ * - Chaque tick qui rate (pas de spawn) ajoute chanceIncrement au bonus global.
+ * - Quand un légendaire spawne, le bonus est remis à 0.
+ * - La chance effective = spawnChance (config) + bonus accumulé, plafonné à maxChance.
+ * - Persiste dans config/legendaryspawner-chances.json pour survivre aux redémarrages.
  */
 public class ChanceTracker {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Type MAP_TYPE = new TypeToken<Map<String, Double>>() {}.getType();
     private static final Path SAVE_PATH = FabricLoader.getInstance()
             .getConfigDir()
             .resolve("legendaryspawner-chances.json");
 
-    // Bonus accumulés (en %) par nom de légendaire
-    private final Map<String, Double> bonuses = new LinkedHashMap<>();
+    private double globalBonus = 0.0;
 
     // ---- Lecture ----
 
-    /**
-     * Retourne la chance effective actuelle d'un légendaire (base + bonus accumulé, plafonné à maxChance).
-     */
-    public double getCurrentChance(String name, LegendaryEntry entry, ModConfig config) {
-        double base = entry.spawnChance >= 0 ? entry.spawnChance : config.defaultSpawnChance;
-        double max  = entry.maxChance  >= 0 ? entry.maxChance  : config.defaultMaxChance;
-        double bonus = bonuses.getOrDefault(name, 0.0);
-        return Math.min(base + bonus, max);
+    /** Chance effective actuelle = spawnChance + bonus accumulé, plafonné à maxChance. */
+    public double getCurrentChance(ModConfig config) {
+        return Math.min(config.spawnChance + globalBonus, config.maxChance);
     }
 
-    /**
-     * Retourne uniquement le bonus accumulé (pour affichage).
-     */
-    public double getBonus(String name) {
-        return bonuses.getOrDefault(name, 0.0);
+    /** Retourne uniquement le bonus accumulé (pour affichage). */
+    public double getGlobalBonus() {
+        return globalBonus;
     }
 
     // ---- Écriture ----
 
-    /**
-     * Incrémente le bonus d'un légendaire (appelé quand il était éligible mais n'a pas spawné).
-     */
-    public void incrementBonus(String name, LegendaryEntry entry, ModConfig config) {
-        double increment = entry.chanceIncrement >= 0 ? entry.chanceIncrement : config.defaultChanceIncrement;
-        if (increment <= 0) return;
-        bonuses.merge(name, increment, Double::sum);
+    /** Appelé quand le tick rate (pas de spawn) : incrémente le bonus. */
+    public void onFailedTick(ModConfig config) {
+        if (config.chanceIncrement <= 0) return;
+        globalBonus = Math.min(globalBonus + config.chanceIncrement,
+                config.maxChance - config.spawnChance);
     }
 
-    /**
-     * Remet le bonus d'un légendaire à 0 (appelé quand il spawne).
-     */
-    public void resetBonus(String name) {
-        bonuses.remove(name);
+    /** Appelé quand un légendaire spawne : remet le bonus à 0. */
+    public void onSpawn() {
+        globalBonus = 0.0;
     }
 
     // ---- Persistance ----
 
     public void save() {
         try (Writer writer = new FileWriter(SAVE_PATH.toFile())) {
-            GSON.toJson(bonuses, writer);
+            GSON.toJson(new SaveData(globalBonus), writer);
         } catch (IOException e) {
             LegendarySpawnerMod.LOGGER.error("[LegendarySpawner] Erreur sauvegarde chances : {}", e.getMessage());
         }
@@ -84,13 +66,18 @@ public class ChanceTracker {
         ChanceTracker tracker = new ChanceTracker();
         if (Files.exists(SAVE_PATH)) {
             try (Reader reader = new FileReader(SAVE_PATH.toFile())) {
-                Map<String, Double> loaded = GSON.fromJson(reader, MAP_TYPE);
-                if (loaded != null) tracker.bonuses.putAll(loaded);
-                LegendarySpawnerMod.LOGGER.info("[LegendarySpawner] Chances accumulées chargées depuis {}", SAVE_PATH);
+                SaveData data = GSON.fromJson(reader, SaveData.class);
+                if (data != null) tracker.globalBonus = data.globalBonus;
+                LegendarySpawnerMod.LOGGER.info("[LegendarySpawner] Bonus accumulé chargé : +{}%", tracker.globalBonus);
             } catch (IOException e) {
                 LegendarySpawnerMod.LOGGER.error("[LegendarySpawner] Erreur lecture chances : {}", e.getMessage());
             }
         }
         return tracker;
+    }
+
+    private static class SaveData {
+        double globalBonus;
+        SaveData(double globalBonus) { this.globalBonus = globalBonus; }
     }
 }

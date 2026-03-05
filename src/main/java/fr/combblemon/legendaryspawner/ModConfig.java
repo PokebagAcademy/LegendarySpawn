@@ -71,22 +71,20 @@ public class ModConfig {
     public boolean logSpawns = true;
 
     /**
-     * Chance de spawn par défaut (en %) par cycle éligible.
-     * Utilisée si un légendaire n'a pas de spawnChance définie.
+     * Chance de base (en %) qu'un légendaire spawne à chaque tick.
      */
-    public double defaultSpawnChance = 25.0;
+    public double spawnChance = 25.0;
 
     /**
-     * Bonus de chance (en %) ajouté par cycle raté par défaut.
-     * Utilisé si un légendaire n'a pas de chanceIncrement défini.
+     * Bonus de % ajouté à spawnChance à chaque tick raté (aucun spawn).
+     * S'accumule jusqu'à maxChance. Remis à 0 quand un légendaire spawne.
      */
-    public double defaultChanceIncrement = 10.0;
+    public double chanceIncrement = 10.0;
 
     /**
-     * Chance maximale par défaut (en %) qu'un légendaire peut atteindre.
-     * Utilisée si un légendaire n'a pas de maxChance définie.
+     * Chance maximale (en %) que le système peut atteindre via accumulation.
      */
-    public double defaultMaxChance = 100.0;
+    public double maxChance = 100.0;
 
     /**
      * Distance minimale (en blocs) à laquelle le légendaire spawne autour du joueur.
