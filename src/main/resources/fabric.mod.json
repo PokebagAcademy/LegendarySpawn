@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "legendaryspawner",
+  "version": "1.0.0",
+  "name": "LegendarySpawner",
+  "description": "Spawn automatique de légendaires Cobblemon",
+  "authors": ["CombblemonServer"],
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "fr.combblemon.legendaryspawner.LegendarySpawnerMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
