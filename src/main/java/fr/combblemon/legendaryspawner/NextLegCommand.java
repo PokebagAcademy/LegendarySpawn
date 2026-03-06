@@ -91,18 +91,9 @@ public class NextLegCommand {
             return e != null ? e.weight : 1;
         }).reversed());
 
-        int total = eligible.stream()
-                .mapToInt(n -> { LegendaryEntry e = cfg.get(n); return e != null ? Math.max(1, e.weight) : 1; })
-                .sum();
-
         int show = Math.min(MAX_SHOWN, eligible.size());
         String list = eligible.subList(0, show).stream()
-                .map(n -> {
-                    LegendaryEntry e = cfg.get(n);
-                    int w = e != null ? Math.max(1, e.weight) : 1;
-                    double pct = (double) w / total * 100;
-                    return String.format("§a%s §8(§e%.0f%%§8)", SpawnController.formatName(n), pct);
-                })
+                .map(n -> "§a" + SpawnController.formatName(n))
                 .collect(Collectors.joining("§7, "));
 
         String suffix = eligible.size() > MAX_SHOWN
