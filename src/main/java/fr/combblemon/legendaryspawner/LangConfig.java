@@ -76,6 +76,7 @@ public class LangConfig {
 
         // --- Aide ---
         messages.put("command.help_header",        "§6§l=== LegendarySpawner ===");
+        messages.put("command.help_info",          "§e/ls info <pokemon> §7- Infos sur un légendaire (conditions, éligibilité)");
         messages.put("command.help_forcespawn",    "§e/ls forcespawn [joueur] §7- Force un spawn (sur un joueur optionnel)");
         messages.put("command.help_reload",        "§e/ls reload §7- Recharge la config et le lang");
         messages.put("command.help_setinterval",   "§e/ls setinterval <min> §7- Change l'intervalle");
@@ -111,8 +112,6 @@ public class LangConfig {
                 "§eDimension: §a{value}");
         messages.put("command.legendary_info_biomes",
                 "§eBiomes: §a{value}");
-        messages.put("command.legendary_info_chance",
-                "§eChance: §abase §e{base}% §a→ actuelle §e{current}% §7(+{bonus}% accumulé, max {max}%, +{increment}%/cycle raté)");
 
         // --- Enable/Disable ---
         messages.put("command.legendary_enabled",
@@ -133,14 +132,8 @@ public class LangConfig {
         // --- /nextleg ---
         messages.put("nextleg.header",
                 "§6§l[✦] §eDans §b{timer} §7| §eChance : §a{chance}%{bonus}");
-        messages.put("nextleg.eligible_list",
-                "§eÉligibles : §a{list}");
         messages.put("nextleg.own_none",
                 "§eÉligibles : §7aucun (biome/conditions non remplis)");
-        messages.put("nextleg.player_line",
-                "§b[{player}] §7({context}) §8: §a{list}");
-        messages.put("nextleg.player_none",
-                "§b[{player}] §7({context}) §8: §7aucun");
         messages.put("nextleg.mod_paused",
                 "§7[LegendarySpawner] En pause (moins de {min} joueurs en ligne).");
 

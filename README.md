@@ -221,20 +221,29 @@ Toutes les commandes utilisent `/legendaryspawner` ou l'alias **`/ls`**.
 
 Si LuckPerms n'est pas installé, le fallback est le niveau OP (level 2 pour les commandes admin, 0 pour les commandes joueur).
 
+### Permissions joueurs
+
 | Nœud | Description | Fallback OP |
 |---|---|---|
-| `legendaryspawner.command.forcespawn` | `/ls forcespawn` | 2 |
-| `legendaryspawner.command.reload` | `/ls reload` | 2 |
-| `legendaryspawner.command.setinterval` | `/ls setinterval` | 2 |
-| `legendaryspawner.command.timer` | `/ls timer` | 2 |
-| `legendaryspawner.command.stats` | `/ls stats` | 2 |
-| `legendaryspawner.command.legendary.list` | `/ls legendary list` | 2 |
-| `legendaryspawner.command.legendary.info` | `/ls legendary info` | 2 |
-| `legendaryspawner.command.legendary.manage` | Toutes les modifs de légendaires | 2 |
-| `legendaryspawner.command.log` | `/ls log` | 2 |
 | `legendaryspawner.nextleg` | `/nextleg` | 0 (tous) |
-| `legendaryspawner.nextleg.details` | Vue admin de `/nextleg` (liste par joueur) | 2 |
-| `legendaryspawner.nextleg.admin` | `/nextlegadmin` | 2 |
+| `legendaryspawner.info` | `/ls info <pokemon>` | 0 (tous) |
+
+### Permissions staff (`legendaryspawner.admin.*`)
+
+| Nœud | Description | Fallback OP |
+|---|---|---|
+| `legendaryspawner.admin.nextleg` | `/nextlegadmin` | 2 |
+| `legendaryspawner.admin.forcespawn` | `/ls forcespawn` | 2 |
+| `legendaryspawner.admin.reload` | `/ls reload` | 2 |
+| `legendaryspawner.admin.setinterval` | `/ls setinterval` | 2 |
+| `legendaryspawner.admin.timer` | `/ls timer` | 2 |
+| `legendaryspawner.admin.stats` | `/ls stats` | 2 |
+| `legendaryspawner.admin.legendary.list` | `/ls legendary list` | 2 |
+| `legendaryspawner.admin.legendary.info` | `/ls legendary info` (vue complète staff) | 2 |
+| `legendaryspawner.admin.legendary.manage` | Toutes les modifs de légendaires | 2 |
+| `legendaryspawner.admin.log` | `/ls log` | 2 |
+
+> **Note :** Donner `legendaryspawner.admin.*` accorde toutes les permissions staff d'un coup.
 
 ---
 

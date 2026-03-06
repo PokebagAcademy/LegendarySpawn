@@ -15,19 +15,21 @@ public class PermissionManager {
 
     // ---- Nœuds de permission ----
 
-    public static final String FORCE_SPAWN       = "legendaryspawner.command.forcespawn";
-    public static final String RELOAD            = "legendaryspawner.command.reload";
-    public static final String SET_INTERVAL      = "legendaryspawner.command.setinterval";
-    public static final String TIMER             = "legendaryspawner.command.timer";
-    public static final String LEGENDARY_LIST    = "legendaryspawner.command.legendary.list";
-    public static final String LEGENDARY_INFO    = "legendaryspawner.command.legendary.info";
-    public static final String LEGENDARY_MANAGE  = "legendaryspawner.command.legendary.manage";
+    // -- Joueurs --
     public static final String NEXTLEG           = "legendaryspawner.nextleg";
-    public static final String NEXTLEG_DETAILS   = "legendaryspawner.nextleg.details";
-    public static final String NEXTLEG_ADMIN     = "legendaryspawner.nextleg.admin";
-    public static final String LOG_VIEW          = "legendaryspawner.command.log";
-    public static final String STATS             = "legendaryspawner.command.stats";
     public static final String INFO              = "legendaryspawner.info";
+
+    // -- Staff (legendaryspawner.admin.*) --
+    public static final String NEXTLEG_ADMIN     = "legendaryspawner.admin.nextleg";
+    public static final String FORCE_SPAWN       = "legendaryspawner.admin.forcespawn";
+    public static final String RELOAD            = "legendaryspawner.admin.reload";
+    public static final String SET_INTERVAL      = "legendaryspawner.admin.setinterval";
+    public static final String TIMER             = "legendaryspawner.admin.timer";
+    public static final String LEGENDARY_LIST    = "legendaryspawner.admin.legendary.list";
+    public static final String LEGENDARY_INFO    = "legendaryspawner.admin.legendary.info";
+    public static final String LEGENDARY_MANAGE  = "legendaryspawner.admin.legendary.manage";
+    public static final String LOG_VIEW          = "legendaryspawner.admin.log";
+    public static final String STATS             = "legendaryspawner.admin.stats";
 
     // ---- API ----
 

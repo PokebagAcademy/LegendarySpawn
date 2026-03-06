@@ -375,6 +375,7 @@ public class LegendaryCommand {
                     .executes(ctx -> {
                         LangConfig lang = LegendarySpawnerMod.getInstance().getLang();
                         send(ctx.getSource(), lang.get("command.help_header"));
+                        send(ctx.getSource(), lang.get("command.help_info"));
                         send(ctx.getSource(), lang.get("command.help_forcespawn"));
                         send(ctx.getSource(), lang.get("command.help_forcespawn_pokemon"));
                         send(ctx.getSource(), lang.get("command.help_reload"));
