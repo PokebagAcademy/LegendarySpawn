@@ -12,9 +12,8 @@ import java.util.stream.Collectors;
 import static net.minecraft.server.command.CommandManager.literal;
 
 /**
- * /nextleg :
- * - Joueur (legendaryspawner.nextleg) : 2 lignes max — timer/chance + éligibles (liste sur 1 ligne)
- * - Admin (legendaryspawner.nextleg.details) : idem + 1 ligne par joueur en ligne
+ * /nextleg : timer + chance de spawn + légendaires éligibles pour le joueur (2 lignes max)
+ * Vue multi-joueurs → /nextlegadmin user
  */
 public class NextLegCommand {
 
@@ -59,33 +58,16 @@ public class NextLegCommand {
             }
         }
 
-        boolean isAdmin = PermissionManager.check(src, PermissionManager.NEXTLEG_DETAILS, 2);
-        Entity caller   = src.getEntity();
+        Entity caller = src.getEntity();
 
-        // Ligne 1 : timer + chance (commune à tous)
+        // Ligne 1 : timer + chance
         send(src, lang.get("nextleg.header",
                 "timer", timer,
                 "chance", String.format("%.1f", currentChance),
                 "bonus", bonusStr));
 
-        if (isAdmin) {
-            // ── Vue admin : une ligne par joueur ──
-            for (ServerPlayerEntity player : src.getServer().getPlayerManager().getPlayerList()) {
-                List<String> eligible = ctrl.buildEligibleNames(player);
-                if (eligible.isEmpty()) {
-                    send(src, lang.get("nextleg.player_none",
-                            "player", player.getName().getString(),
-                            "context", buildContextString(player)));
-                } else {
-                    send(src, lang.get("nextleg.player_line",
-                            "player", player.getName().getString(),
-                            "context", buildContextString(player),
-                            "list", formatList(eligible)));
-                }
-            }
-
-        } else if (caller instanceof ServerPlayerEntity player) {
-            // ── Vue joueur : ses propres éligibles sur 1 ligne ──
+        // Ligne 2 : légendaires éligibles pour le joueur
+        if (caller instanceof ServerPlayerEntity player) {
             List<String> eligible = ctrl.buildEligibleNames(player);
             if (eligible.isEmpty()) {
                 send(src, lang.get("nextleg.own_none"));
@@ -101,22 +83,6 @@ public class NextLegCommand {
         return names.stream()
                 .map(SpawnController::formatName)
                 .collect(Collectors.joining("§7, §a"));
-    }
-
-    private static String buildContextString(ServerPlayerEntity player) {
-        String dim = player.getServerWorld().getRegistryKey().getValue().toString();
-        String dimStr = switch (dim) {
-            case "minecraft:overworld"  -> "overworld";
-            case "minecraft:the_nether" -> "nether";
-            case "minecraft:the_end"    -> "end";
-            default -> dim;
-        };
-        String timeStr    = player.getServerWorld().isDay() ? "jour" : "nuit";
-        String weatherStr;
-        if (player.getServerWorld().isThundering())   weatherStr = "orage";
-        else if (player.getServerWorld().isRaining()) weatherStr = "pluie";
-        else                                           weatherStr = "clair";
-        return dimStr + " • " + timeStr + " • " + weatherStr;
     }
 
     private static void send(ServerCommandSource src, String msg) {
