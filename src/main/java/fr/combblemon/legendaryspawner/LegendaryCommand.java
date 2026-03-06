@@ -121,7 +121,7 @@ public class LegendaryCommand {
 
             dispatcher.register(
                 literal("legendaryspawner")
-                .requires(perm(PermissionManager.FORCE_SPAWN))
+                .requires(src -> true)
 
                 // /ls forcespawn [joueur] / /ls forcespawn pokemon <nom> [joueur]
                 .then(literal("forcespawn")
@@ -392,7 +392,7 @@ public class LegendaryCommand {
             // Alias /ls
             dispatcher.register(
                 literal("ls")
-                .requires(perm(PermissionManager.FORCE_SPAWN))
+                .requires(src -> true)
                 .redirect(dispatcher.getRoot().getChild("legendaryspawner"))
             );
         });
