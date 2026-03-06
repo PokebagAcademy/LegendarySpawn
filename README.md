@@ -288,4 +288,4 @@ Les spawns sont enregistrés dans `logs/legendaryspawner-spawns.log` (si `logSpa
 
 ## Licence
 
-Ce mod est développé pour le serveur **CombblemonServer**. Usage interne.
+Ce mod est développé pour le serveur **PokebagAcademy**. Usage interne.
