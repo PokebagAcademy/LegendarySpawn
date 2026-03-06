@@ -15,8 +15,9 @@ import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
 /**
- * /nextlegadmin global [page] — distribution pondérée de tous les légendaires activés
- * /nextlegadmin user [joueur]  — pool éligible + % pour un joueur spécifique
+ * /nextlegadmin global [page] — chances réelles en tenant compte de tous les joueurs connectés
+ * /nextlegadmin raw    [page] — distribution théorique brute par poids (ignore positions)
+ * /nextlegadmin user   [joueur] — pool éligible + % pour un joueur spécifique
  */
 public class NextLegAdminCommand {
 
@@ -36,6 +37,14 @@ public class NextLegAdminCommand {
                                 IntegerArgumentType.getInteger(ctx, "page"))))
                 )
 
+                // /nextlegadmin raw [page]
+                .then(literal("raw")
+                    .executes(ctx -> handleRaw(ctx.getSource(), 1))
+                    .then(argument("page", IntegerArgumentType.integer(1))
+                        .executes(ctx -> handleRaw(ctx.getSource(),
+                                IntegerArgumentType.getInteger(ctx, "page"))))
+                )
+
                 // /nextlegadmin user [joueur]
                 .then(literal("user")
                     .executes(ctx -> {
@@ -52,9 +61,55 @@ public class NextLegAdminCommand {
         );
     }
 
-    // ---- Global ----
+    // ---- Global (live) ----
 
     private static int handleGlobal(ServerCommandSource src, int page) {
+        SpawnController ctrl = LegendarySpawnerMod.getInstance().getSpawnController();
+        LegendaryConfig legendaryConfig = LegendarySpawnerMod.getInstance().getLegendaryConfig();
+        if (ctrl == null) { send(src, "§cSpawnController non initialisé."); return 0; }
+
+        int online = src.getServer().getPlayerManager().getCurrentPlayerCount();
+
+        List<SpawnController.LiveCandidate> candidates = ctrl.getLiveCandidates();
+
+        if (candidates.isEmpty()) {
+            send(src, String.format("§6=== Distribution live §8(%d joueur(s) en ligne) ===", online));
+            send(src, "§7Aucun légendaire spawnable dans les conditions actuelles.");
+            return 1;
+        }
+
+        // Tri par weight décroissant
+        candidates.sort(Comparator.comparingInt(SpawnController.LiveCandidate::weight).reversed());
+
+        int totalWeight = candidates.stream().mapToInt(SpawnController.LiveCandidate::weight).sum();
+        int totalPages  = Math.max(1, (int) Math.ceil((double) candidates.size() / PAGE_SIZE));
+        int p    = Math.max(1, Math.min(page, totalPages));
+        int from = (p - 1) * PAGE_SIZE;
+        int to   = Math.min(from + PAGE_SIZE, candidates.size());
+
+        send(src, String.format(
+                "§6=== Spawn live §8(p.%d/%d | §f%d§8/§f%d §8leg. actifs | §f%d§8 joueur(s)) ===",
+                p, totalPages, candidates.size(),
+                (int) legendaryConfig.getAll().values().stream().filter(e -> e.enabled).count(),
+                online));
+
+        for (SpawnController.LiveCandidate c : candidates.subList(from, to)) {
+            LegendaryEntry entry = legendaryConfig.get(c.name());
+            double pct = (double) c.weight() / totalWeight * 100.0;
+            String display = SpawnController.getDisplayName(c.name(), entry);
+            send(src, String.format("§a%s §8[§7w:%d§8] §e%.1f%% §8│ §7%d joueur(s) éligible(s)",
+                    display, c.weight(), pct, c.eligiblePlayers()));
+        }
+
+        if (totalPages > 1 && p < totalPages)
+            send(src, "§8→ /nextlegadmin global " + (p + 1) + " §7pour la suite");
+
+        return 1;
+    }
+
+    // ---- Raw (théorique) ----
+
+    private static int handleRaw(ServerCommandSource src, int page) {
         LegendaryConfig legendaryConfig = LegendarySpawnerMod.getInstance().getLegendaryConfig();
         SpawnController ctrl = LegendarySpawnerMod.getInstance().getSpawnController();
 
@@ -70,7 +125,7 @@ public class NextLegAdminCommand {
         int from = (p - 1) * PAGE_SIZE;
         int to   = Math.min(from + PAGE_SIZE, enabled.size());
 
-        send(src, String.format("§6=== Distribution globale §8(p.%d/%d | %d légendaires | weight total: %d) ===",
+        send(src, String.format("§6=== Distribution brute §8(p.%d/%d | %d légendaires | weight total: %d) ===",
                 p, totalPages, enabled.size(), totalWeight));
 
         for (Map.Entry<String, LegendaryEntry> e : enabled.subList(from, to)) {
@@ -86,7 +141,7 @@ public class NextLegAdminCommand {
         }
 
         if (totalPages > 1 && p < totalPages)
-            send(src, "§8→ /nextlegadmin global " + (p + 1) + " §7pour la suite");
+            send(src, "§8→ /nextlegadmin raw " + (p + 1) + " §7pour la suite");
 
         return 1;
     }
@@ -109,7 +164,6 @@ public class NextLegAdminCommand {
             return 1;
         }
 
-        // Tri par weight décroissant
         eligible.sort(Comparator.comparingInt((String n) -> {
             LegendaryEntry e = legendaryConfig.get(n);
             return e != null ? e.weight : 1;

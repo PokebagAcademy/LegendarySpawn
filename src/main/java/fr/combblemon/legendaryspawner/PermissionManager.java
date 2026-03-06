@@ -27,6 +27,7 @@ public class PermissionManager {
     public static final String NEXTLEG_ADMIN     = "legendaryspawner.nextleg.admin";
     public static final String LOG_VIEW          = "legendaryspawner.command.log";
     public static final String STATS             = "legendaryspawner.command.stats";
+    public static final String INFO              = "legendaryspawner.info";
 
     // ---- API ----
 

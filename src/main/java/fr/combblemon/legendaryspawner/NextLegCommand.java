@@ -6,6 +6,7 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -66,23 +67,49 @@ public class NextLegCommand {
                 "chance", String.format("%.1f", currentChance),
                 "bonus", bonusStr));
 
-        // Ligne 2 : légendaires éligibles pour le joueur
+        // Ligne 2 : top légendaires éligibles avec % pour le joueur
         if (caller instanceof ServerPlayerEntity player) {
             List<String> eligible = ctrl.buildEligibleNames(player);
             if (eligible.isEmpty()) {
                 send(src, lang.get("nextleg.own_none"));
             } else {
-                send(src, lang.get("nextleg.eligible_list", "list", formatList(eligible)));
+                send(src, formatEligibleLine(eligible));
             }
         }
 
         return 1;
     }
 
-    private static String formatList(List<String> names) {
-        return names.stream()
-                .map(SpawnController::formatName)
-                .collect(Collectors.joining("§7, §a"));
+    private static final int MAX_SHOWN = 5;
+
+    private static String formatEligibleLine(List<String> eligible) {
+        LegendaryConfig cfg = LegendarySpawnerMod.getInstance().getLegendaryConfig();
+
+        // Tri par weight décroissant
+        eligible.sort(Comparator.comparingInt((String n) -> {
+            LegendaryEntry e = cfg.get(n);
+            return e != null ? e.weight : 1;
+        }).reversed());
+
+        int total = eligible.stream()
+                .mapToInt(n -> { LegendaryEntry e = cfg.get(n); return e != null ? Math.max(1, e.weight) : 1; })
+                .sum();
+
+        int show = Math.min(MAX_SHOWN, eligible.size());
+        String list = eligible.subList(0, show).stream()
+                .map(n -> {
+                    LegendaryEntry e = cfg.get(n);
+                    int w = e != null ? Math.max(1, e.weight) : 1;
+                    double pct = (double) w / total * 100;
+                    return String.format("§a%s §8(§e%.0f%%§8)", SpawnController.formatName(n), pct);
+                })
+                .collect(Collectors.joining("§7, "));
+
+        String suffix = eligible.size() > MAX_SHOWN
+                ? String.format("§7 ... §8(+%d autres)", eligible.size() - MAX_SHOWN)
+                : "";
+
+        return String.format("§7Éligibles §8(§f%d§8)§7: %s%s", eligible.size(), list, suffix);
     }
 
     private static void send(ServerCommandSource src, String msg) {

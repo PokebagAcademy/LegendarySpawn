@@ -139,6 +139,29 @@ public class SpawnController {
         return entry != null && isOnCooldown(name, entry);
     }
 
+    public record LiveCandidate(String name, int eligiblePlayers, int weight) {}
+
+    /** Retourne les légendaires spawnable RIGHT NOW (au moins 1 joueur éligible, pas en cooldown). */
+    public List<LiveCandidate> getLiveCandidates() {
+        List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
+        List<LiveCandidate> result = new ArrayList<>();
+        for (Map.Entry<String, LegendaryEntry> entry : legendaryConfig.getAll().entrySet()) {
+            LegendaryEntry def = entry.getValue();
+            if (!def.enabled) continue;
+            if (isOnCooldown(entry.getKey(), def)) continue;
+            long matching = players.stream()
+                    .filter(p -> !isAfk(p))
+                    .filter(p -> matchesBiome(def, p))
+                    .filter(p -> matchesDimension(def, p))
+                    .filter(p -> matchesTimeOfDay(def, p))
+                    .filter(p -> matchesWeather(def, p))
+                    .count();
+            if (matching > 0)
+                result.add(new LiveCandidate(entry.getKey(), (int) matching, Math.max(1, def.weight)));
+        }
+        return result;
+    }
+
     // ---- Spawn automatique ----
 
     private void spawnLegendary(@Nullable ServerPlayerEntity fixedTarget) {

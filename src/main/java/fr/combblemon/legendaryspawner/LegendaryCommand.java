@@ -6,6 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.command.argument.EntityArgumentType;
+import net.minecraft.entity.Entity;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -42,7 +43,21 @@ public class LegendaryCommand {
 
     private static final SuggestionProvider<ServerCommandSource> LEGENDARY_SUGGESTIONS =
             (ctx, builder) -> {
-                LegendarySpawnerMod.getInstance().getLegendaryConfig().getAll().keySet()
+                String rem = builder.getRemaining().toLowerCase();
+                LegendarySpawnerMod.getInstance().getLegendaryConfig().getAll().keySet().stream()
+                        .filter(n -> rem.isEmpty() || n.startsWith(rem))
+                        .forEach(builder::suggest);
+                return builder.buildFuture();
+            };
+
+    // Suggestions joueur : uniquement les légendaires activés
+    private static final SuggestionProvider<ServerCommandSource> ENABLED_SUGGESTIONS =
+            (ctx, builder) -> {
+                String rem = builder.getRemaining().toLowerCase();
+                LegendarySpawnerMod.getInstance().getLegendaryConfig().getAll().entrySet().stream()
+                        .filter(e -> e.getValue().enabled)
+                        .map(Map.Entry::getKey)
+                        .filter(n -> rem.isEmpty() || n.startsWith(rem))
                         .forEach(builder::suggest);
                 return builder.buildFuture();
             };
@@ -161,6 +176,16 @@ public class LegendaryCommand {
                             ctrl.forceSpawn(target);
                             return 1;
                         })
+                    )
+                )
+
+                // /ls info <pokemon> (accessible aux joueurs)
+                .then(literal("info")
+                    .requires(src -> PermissionManager.check(src, PermissionManager.INFO, 0))
+                    .then(argument("pokemon", StringArgumentType.word())
+                        .suggests(ENABLED_SUGGESTIONS)
+                        .executes(ctx -> handlePublicInfo(ctx.getSource(),
+                                StringArgumentType.getString(ctx, "pokemon")))
                     )
                 )
 
@@ -576,6 +601,75 @@ public class LegendaryCommand {
                     "time",    stats.lastTime != null   ? stats.lastTime   : "?"));
         }
         return 1;
+    }
+
+    // ---- Info publique joueur ----
+
+    private static int handlePublicInfo(ServerCommandSource src, String name) {
+        LegendaryConfig legendaryConfig = LegendarySpawnerMod.getInstance().getLegendaryConfig();
+        ModConfig cfg = LegendarySpawnerMod.getInstance().getConfig();
+        LegendaryEntry entry = legendaryConfig.get(name);
+
+        if (entry == null || !entry.enabled) {
+            send(src, "§cCe légendaire n'existe pas ou n'est pas actif.");
+            return 0;
+        }
+
+        String display = SpawnController.getDisplayName(name, entry);
+        String level   = buildLevelString(entry, cfg.legendaryLevel);
+
+        send(src, "§6§l══════════════════");
+        send(src, "  §6✦ §e§l" + display);
+        send(src, "§6§l══════════════════");
+        send(src, "§7  Niveau      §8: §f" + level);
+
+        String dimDisplay = entry.dimension == null || entry.dimension.equalsIgnoreCase("any")
+                ? "§7partout" : "§f" + formatDimDisplay(entry.dimension);
+        send(src, "§7  Dimension   §8: " + dimDisplay);
+
+        String timeDisplay = entry.timeOfDay == null || entry.timeOfDay.equalsIgnoreCase("any")
+                ? "§7indifférent" : "§f" + entry.timeOfDay;
+        send(src, "§7  Heure       §8: " + timeDisplay);
+
+        String weatherDisplay = entry.weather == null || entry.weather.equalsIgnoreCase("any")
+                ? "§7indifférent" : "§f" + entry.weather;
+        send(src, "§7  Météo       §8: " + weatherDisplay);
+
+        if (entry.biomes != null && !entry.biomes.isEmpty()) {
+            String biomeList = entry.biomes.stream()
+                    .map(b -> b.contains(":") ? b.substring(b.indexOf(':') + 1) : b)
+                    .collect(java.util.stream.Collectors.joining("§7, §f"));
+            send(src, "§7  Biomes      §8: §f" + biomeList);
+        } else {
+            send(src, "§7  Biomes      §8: §7tous");
+        }
+
+        // Éligibilité pour ce joueur
+        Entity caller = src.getEntity();
+        if (caller instanceof ServerPlayerEntity player) {
+            SpawnController ctrl = LegendarySpawnerMod.getInstance().getSpawnController();
+            if (ctrl != null) {
+                boolean eligible = ctrl.buildEligibleNames(player).contains(name);
+                send(src, eligible
+                        ? "§a  ✔ Peut spawner dans tes conditions actuelles"
+                        : "§c  ✘ Conditions non remplies pour toi en ce moment");
+            }
+        }
+
+        send(src, "§6§l══════════════════");
+        return 1;
+    }
+
+    private static String formatDimDisplay(String dim) {
+        return switch (dim.toLowerCase()) {
+            case "overworld" -> "Overworld";
+            case "nether"    -> "Nether";
+            case "end"       -> "End";
+            case "minecraft:overworld"  -> "Overworld";
+            case "minecraft:the_nether" -> "Nether";
+            case "minecraft:the_end"    -> "End";
+            default -> dim;
+        };
     }
 
     // ---- Log ----
